@@ -782,10 +782,10 @@ async def shutdown_db_client():
 @app.on_event("startup")
 async def create_default_admin():
     """Create default admin user if not exists"""
-    admin = await db.users.find_one({"email": "admin@scanner.local"})
+    admin = await db.users.find_one({"email": "admin@securescan.com"})
     if not admin:
         admin_user = User(
-            email="admin@scanner.local",
+            email="admin@securescan.com",
             password_hash=get_password_hash("admin123"),
             name="System Admin",
             role="admin",
@@ -795,4 +795,4 @@ async def create_default_admin():
         admin_dict['created_at'] = admin_dict['created_at'].isoformat()
         admin_dict['updated_at'] = admin_dict['updated_at'].isoformat()
         await db.users.insert_one(admin_dict)
-        logger.info("Default admin user created: admin@scanner.local / admin123")
+        logger.info("Default admin user created: admin@securescan.com / admin123")

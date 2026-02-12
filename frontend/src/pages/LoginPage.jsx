@@ -124,7 +124,7 @@ export default function LoginPage() {
               </Link>
             </div>
             <div className="mt-4 p-3 bg-secondary/30 rounded-sm text-sm">
-              <p className="text-muted-foreground">Demo: admin@scanner.local / admin123</p>
+              <p className="text-muted-foreground">Demo: admin@securescan.com / admin123</p>
             </div>
           </CardContent>
         </Card>
