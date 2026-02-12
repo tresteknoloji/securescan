@@ -1,0 +1,371 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth, useLanguage } from '../contexts/AppContext';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Progress } from '../components/ui/progress';
+import { ScrollArea } from '../components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  Radar,
+  ArrowLeft,
+  FileText,
+  StopCircle,
+  RefreshCw,
+  Loader2,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Shield,
+  Server,
+  Lock,
+  ExternalLink,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+const STATUS_CONFIG = {
+  pending: { icon: Clock, color: 'bg-muted text-muted-foreground', label: 'pending' },
+  running: { icon: Loader2, color: 'bg-blue-500/20 text-blue-400', label: 'running', animate: true },
+  completed: { icon: CheckCircle, color: 'bg-green-500/20 text-green-400', label: 'completed' },
+  failed: { icon: XCircle, color: 'bg-red-500/20 text-red-400', label: 'failed' },
+  cancelled: { icon: AlertTriangle, color: 'bg-yellow-500/20 text-yellow-400', label: 'cancelled' },
+};
+
+const SEVERITY_CONFIG = {
+  critical: { color: 'severity-critical', icon: AlertTriangle },
+  high: { color: 'severity-high', icon: AlertTriangle },
+  medium: { color: 'severity-medium', icon: Shield },
+  low: { color: 'severity-low', icon: Shield },
+  info: { color: 'severity-info', icon: Shield },
+};
+
+export default function ScanDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { api, token } = useAuth();
+  const { t } = useLanguage();
+  const [scan, setScan] = useState(null);
+  const [vulnerabilities, setVulnerabilities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSeverity, setSelectedSeverity] = useState('all');
+
+  useEffect(() => {
+    fetchScan();
+    const interval = setInterval(() => {
+      if (scan?.status === 'running' || scan?.status === 'pending') {
+        fetchScan();
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [id, scan?.status]);
+
+  const fetchScan = async () => {
+    try {
+      const [scanRes, vulnRes] = await Promise.all([
+        api.get(`/scans/${id}`),
+        api.get(`/scans/${id}/vulnerabilities`),
+      ]);
+      setScan(scanRes.data);
+      setVulnerabilities(vulnRes.data);
+    } catch (error) {
+      toast.error(t('error'));
+      navigate('/scans');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      await api.post(`/scans/${id}/cancel`);
+      toast.success(t('success'));
+      fetchScan();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || t('error'));
+    }
+  };
+
+  const handleDownloadReport = (format) => {
+    window.open(
+      `${process.env.REACT_APP_BACKEND_URL}/api/scans/${id}/report?format=${format}`,
+      '_blank'
+    );
+  };
+
+  const filteredVulnerabilities = vulnerabilities.filter(
+    (v) => selectedSeverity === 'all' || v.severity === selectedSeverity
+  );
+
+  // Sort vulnerabilities by severity
+  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  const sortedVulnerabilities = [...filteredVulnerabilities].sort(
+    (a, b) => severityOrder[a.severity] - severityOrder[b.severity]
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96" data-testid="scan-detail-loading">
+        <Loader2 className="h-8 w-8 spinner text-primary" />
+      </div>
+    );
+  }
+
+  if (!scan) return null;
+
+  const statusConfig = STATUS_CONFIG[scan.status] || STATUS_CONFIG.pending;
+  const StatusIcon = statusConfig.icon;
+
+  return (
+    <div className="space-y-6" data-testid="scan-detail-page">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/scans')}
+            data-testid="back-btn"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">{scan.name}</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <Badge className={statusConfig.color}>
+                <StatusIcon className={`mr-1 h-3 w-3 ${statusConfig.animate ? 'spinner' : ''}`} />
+                {t(statusConfig.label)}
+              </Badge>
+              <span className="text-sm text-muted-foreground mono">
+                {new Date(scan.created_at).toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {scan.status === 'running' && (
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              data-testid="cancel-scan-btn"
+            >
+              <StopCircle className="mr-2 h-4 w-4" />
+              {t('stop_scan')}
+            </Button>
+          )}
+          {scan.status === 'completed' && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => handleDownloadReport('html')}
+                data-testid="download-html-btn"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                HTML
+              </Button>
+              <Button
+                onClick={() => handleDownloadReport('pdf')}
+                data-testid="download-pdf-btn"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                PDF
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={fetchScan}
+            data-testid="refresh-btn"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Progress */}
+      {(scan.status === 'running' || scan.status === 'pending') && (
+        <Card data-testid="scan-progress-card">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <Progress value={scan.progress} className="h-3" />
+              </div>
+              <span className="text-lg font-bold mono">{scan.progress}%</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { key: 'critical', count: scan.critical_count, color: 'text-[#EF4444]' },
+          { key: 'high', count: scan.high_count, color: 'text-[#F97316]' },
+          { key: 'medium', count: scan.medium_count, color: 'text-[#F59E0B]' },
+          { key: 'low', count: scan.low_count, color: 'text-[#EAB308]' },
+          { key: 'info', count: scan.info_count, color: 'text-[#3B82F6]' },
+        ].map(({ key, count, color }) => (
+          <Card
+            key={key}
+            className={`stat-${key} card-hover cursor-pointer ${
+              selectedSeverity === key ? 'ring-2 ring-primary' : ''
+            }`}
+            onClick={() => setSelectedSeverity(selectedSeverity === key ? 'all' : key)}
+            data-testid={`stat-${key}`}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t(key)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-3xl font-bold mono ${color}`}>{count}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Vulnerabilities */}
+      <Card data-testid="vulnerabilities-card">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              {t('vulnerabilities')} ({sortedVulnerabilities.length})
+            </CardTitle>
+            {selectedSeverity !== 'all' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedSeverity('all')}
+              >
+                Show All
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sortedVulnerabilities.length > 0 ? (
+            <ScrollArea className="h-[500px]">
+              <div className="space-y-4 pr-4">
+                {sortedVulnerabilities.map((vuln) => {
+                  const sevConfig = SEVERITY_CONFIG[vuln.severity] || SEVERITY_CONFIG.info;
+                  const SeverityIcon = sevConfig.icon;
+                  return (
+                    <div
+                      key={vuln.id}
+                      className="border border-border rounded-sm overflow-hidden"
+                      data-testid={`vuln-${vuln.id}`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
+                        <Badge className={sevConfig.color}>
+                          <SeverityIcon className="mr-1 h-3 w-3" />
+                          {t(vuln.severity)}
+                        </Badge>
+                        <h4 className="font-medium flex-1">{vuln.title}</h4>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mono">
+                          {vuln.port && (
+                            <span className="flex items-center gap-1">
+                              <Server className="h-3 w-3" />
+                              Port {vuln.port}
+                            </span>
+                          )}
+                          {vuln.service && (
+                            <Badge variant="outline">{vuln.service}</Badge>
+                          )}
+                        </div>
+                      </div>
+                      {/* Body */}
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <p className="text-sm text-muted-foreground">{vuln.description}</p>
+                        </div>
+                        {vuln.solution && (
+                          <div>
+                            <p className="text-sm font-medium text-green-400">{t('solution')}:</p>
+                            <p className="text-sm text-muted-foreground">{vuln.solution}</p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4 text-sm">
+                          {vuln.cve_id && (
+                            <span className="mono bg-secondary/50 px-2 py-1 rounded">
+                              {vuln.cve_id}
+                            </span>
+                          )}
+                          {vuln.cvss_score && (
+                            <span className="text-muted-foreground">
+                              CVSS: <span className="font-medium">{vuln.cvss_score}</span>
+                            </span>
+                          )}
+                          <span className="text-muted-foreground mono">
+                            Target: {vuln.target_value}
+                          </span>
+                        </div>
+                        {vuln.references && vuln.references.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {vuln.references.slice(0, 3).map((ref, idx) => (
+                              <a
+                                key={idx}
+                                href={ref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Reference {idx + 1}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Shield className="h-12 w-12 mx-auto mb-4 opacity-30" />
+              <p>
+                {scan.status === 'running' || scan.status === 'pending'
+                  ? 'Scanning in progress...'
+                  : 'No vulnerabilities found'}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Live Terminal Output */}
+      {(scan.status === 'running' || scan.status === 'pending') && (
+        <Card data-testid="live-output-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Radar className="h-5 w-5 status-running" />
+              {t('live_results')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="terminal h-40 overflow-auto">
+              <div className="terminal-line">
+                <span className="terminal-timestamp">[{new Date().toLocaleTimeString()}]</span>
+                <span>Scanning targets... {scan.progress}% complete</span>
+              </div>
+              {vulnerabilities.slice(-5).map((v, i) => (
+                <div key={i} className="terminal-line">
+                  <span className="terminal-timestamp">[FOUND]</span>
+                  <span style={{ color: SEVERITY_CONFIG[v.severity]?.color?.includes('critical') ? '#EF4444' : '#22c55e' }}>
+                    {v.severity.toUpperCase()}: {v.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
