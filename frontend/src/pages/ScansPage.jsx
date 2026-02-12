@@ -57,7 +57,7 @@ export default function ScansPage() {
     fetchScans();
     const interval = setInterval(fetchScans, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchScans = async () => {
     try {
