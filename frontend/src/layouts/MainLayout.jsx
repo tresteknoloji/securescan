@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useLanguage } from '../contexts/AppContext';
 import { Button } from '../components/ui/button';
@@ -25,6 +25,8 @@ import {
   User,
   Globe,
   Menu,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -44,6 +46,17 @@ export const MainLayout = ({ children }) => {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
 
   const handleLogout = () => {
     logout();
@@ -53,7 +66,7 @@ export const MainLayout = ({ children }) => {
   const filteredNavItems = navItems.filter(item => item.roles.includes(user?.role || 'customer'));
 
   return (
-    <div className="min-h-screen bg-background flex" data-testid="main-layout">
+    <div className={`min-h-screen flex ${theme === 'light' ? 'bg-gray-50' : 'bg-background'}`} data-testid="main-layout">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -65,14 +78,15 @@ export const MainLayout = ({ children }) => {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-card transition-all duration-300',
+          'fixed lg:static inset-y-0 left-0 z-50 flex flex-col border-r transition-all duration-300',
+          theme === 'light' ? 'border-gray-200 bg-white' : 'border-border bg-card',
           collapsed ? 'w-16' : 'w-64',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
         data-testid="sidebar"
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-border">
+        <div className={`flex items-center justify-between h-16 px-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-border'}`}>
           <Link to="/dashboard" className="flex items-center gap-2">
             <Shield className="h-8 w-8 text-primary flex-shrink-0" />
             {!collapsed && <span className="font-bold text-lg">SecureScan</span>}
@@ -119,7 +133,7 @@ export const MainLayout = ({ children }) => {
         </ScrollArea>
 
         {/* User section */}
-        <div className="p-2 border-t border-border">
+        <div className={`p-2 border-t ${theme === 'light' ? 'border-gray-200' : 'border-border'}`}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -133,7 +147,7 @@ export const MainLayout = ({ children }) => {
                 {!collapsed && (
                   <div className="text-left overflow-hidden">
                     <p className="text-sm font-medium truncate">{user?.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
+                    <p className={`text-xs truncate ${theme === 'light' ? 'text-gray-500' : 'text-muted-foreground'}`}>{user?.role}</p>
                   </div>
                 )}
               </Button>
@@ -141,6 +155,10 @@ export const MainLayout = ({ children }) => {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={toggleTheme}>
+                {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                {theme === 'dark' ? (language === 'tr' ? 'Aydınlık Tema' : 'Light Theme') : (language === 'tr' ? 'Karanlık Tema' : 'Dark Theme')}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => changeLanguage(language === 'tr' ? 'en' : 'tr')}>
                 <Globe className="mr-2 h-4 w-4" />
                 {language === 'tr' ? 'English' : 'Türkçe'}
@@ -158,7 +176,7 @@ export const MainLayout = ({ children }) => {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar for mobile */}
-        <header className="lg:hidden h-16 border-b border-border flex items-center justify-between px-4 bg-card">
+        <header className={`lg:hidden h-16 border-b flex items-center justify-between px-4 ${theme === 'light' ? 'border-gray-200 bg-white' : 'border-border bg-card'}`}>
           <Button
             variant="ghost"
             size="icon"
@@ -168,7 +186,9 @@ export const MainLayout = ({ children }) => {
             <Menu className="h-5 w-5" />
           </Button>
           <Shield className="h-8 w-8 text-primary" />
-          <div className="w-10" /> {/* Spacer */}
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
         </header>
 
         {/* Page content */}
@@ -177,6 +197,11 @@ export const MainLayout = ({ children }) => {
             {children}
           </div>
         </main>
+
+        {/* Footer */}
+        <footer className={`py-4 px-6 text-center text-sm border-t ${theme === 'light' ? 'border-gray-200 text-gray-500' : 'border-border text-muted-foreground'}`}>
+          © 2026 Tres Technology LLC. {language === 'tr' ? 'Tüm hakları saklıdır.' : 'All rights reserved.'}
+        </footer>
       </div>
     </div>
   );
