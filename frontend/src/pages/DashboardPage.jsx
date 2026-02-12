@@ -54,7 +54,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchStats = async () => {
     try {
