@@ -61,23 +61,23 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, [fetchUser]);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     const { access_token, user: userData } = response.data;
     localStorage.setItem('token', access_token);
     setToken(access_token);
     setUser(userData);
     return userData;
-  };
+  }, [api]);
 
-  const register = async (data) => {
+  const register = useCallback(async (data) => {
     const response = await api.post('/auth/register', data);
     const { access_token, user: userData } = response.data;
     localStorage.setItem('token', access_token);
     setToken(access_token);
     setUser(userData);
     return userData;
-  };
+  }, [api]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
