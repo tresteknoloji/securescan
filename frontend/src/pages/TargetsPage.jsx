@@ -71,14 +71,14 @@ export default function TargetsPage() {
 
   useEffect(() => {
     fetchTargets();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTargets = async () => {
     try {
       const response = await api.get('/targets');
       setTargets(response.data);
     } catch (error) {
-      toast.error(t('error'));
+      toast.error('Failed to load targets');
     } finally {
       setLoading(false);
     }
