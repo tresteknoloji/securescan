@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth, useLanguage } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -6,7 +6,6 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { ScrollArea } from '../components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Radar,
   ArrowLeft,
@@ -20,7 +19,6 @@ import {
   AlertTriangle,
   Shield,
   Server,
-  Lock,
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,54 +49,48 @@ export default function ScanDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedSeverity, setSelectedSeverity] = useState('all');
 
-  const fetchScan = async () => {
+  const fetchScan = useCallback(async () => {
     try {
       const [scanRes, vulnRes] = await Promise.all([
-        api.get(`/scans/${id}`),
-        api.get(`/scans/${id}/vulnerabilities`),
+        api.get('/scans/' + id),
+        api.get('/scans/' + id + '/vulnerabilities'),
       ]);
       setScan(scanRes.data);
       setVulnerabilities(vulnRes.data);
     } catch (error) {
-      toast.error(t('error'));
+      toast.error('Failed to load scan');
       navigate('/scans');
     } finally {
       setLoading(false);
     }
-  };
+  }, [api, id, navigate]);
 
   useEffect(() => {
     fetchScan();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [fetchScan]);
 
-  // Auto refresh for running scans
   useEffect(() => {
     if (!scan || (scan.status !== 'running' && scan.status !== 'pending')) {
       return;
     }
     
-    const interval = setInterval(() => {
-      fetchScan();
-    }, 3000);
-    
+    const interval = setInterval(fetchScan, 3000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scan?.status]);
+  }, [scan, fetchScan]);
 
   const handleCancel = async () => {
     try {
-      await api.post(`/scans/${id}/cancel`);
-      toast.success(t('success'));
+      await api.post('/scans/' + id + '/cancel');
+      toast.success('Scan cancelled');
       fetchScan();
     } catch (error) {
-      toast.error(error.response?.data?.detail || t('error'));
+      toast.error(error.response?.data?.detail || 'Error');
     }
   };
 
   const handleDownloadReport = (format) => {
     window.open(
-      `${process.env.REACT_APP_BACKEND_URL}/api/scans/${id}/report?format=${format}`,
+      process.env.REACT_APP_BACKEND_URL + '/api/scans/' + id + '/report?format=' + format,
       '_blank'
     );
   };
@@ -107,7 +99,6 @@ export default function ScanDetailPage() {
     (v) => selectedSeverity === 'all' || v.severity === selectedSeverity
   );
 
-  // Sort vulnerabilities by severity
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
   const sortedVulnerabilities = [...filteredVulnerabilities].sort(
     (a, b) => severityOrder[a.severity] - severityOrder[b.severity]
@@ -128,7 +119,6 @@ export default function ScanDetailPage() {
 
   return (
     <div className="space-y-6" data-testid="scan-detail-page">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
@@ -143,7 +133,7 @@ export default function ScanDetailPage() {
             <h1 className="text-3xl font-bold">{scan.name}</h1>
             <div className="flex items-center gap-3 mt-1">
               <Badge className={statusConfig.color}>
-                <StatusIcon className={`mr-1 h-3 w-3 ${statusConfig.animate ? 'spinner' : ''}`} />
+                <StatusIcon className={'mr-1 h-3 w-3 ' + (statusConfig.animate ? 'spinner' : '')} />
                 {t(statusConfig.label)}
               </Badge>
               <span className="text-sm text-muted-foreground mono">
@@ -154,46 +144,29 @@ export default function ScanDetailPage() {
         </div>
         <div className="flex gap-2">
           {scan.status === 'running' && (
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              data-testid="cancel-scan-btn"
-            >
+            <Button variant="outline" onClick={handleCancel} data-testid="cancel-scan-btn">
               <StopCircle className="mr-2 h-4 w-4" />
               {t('stop_scan')}
             </Button>
           )}
           {scan.status === 'completed' && (
             <>
-              <Button
-                variant="outline"
-                onClick={() => handleDownloadReport('html')}
-                data-testid="download-html-btn"
-              >
+              <Button variant="outline" onClick={() => handleDownloadReport('html')} data-testid="download-html-btn">
                 <FileText className="mr-2 h-4 w-4" />
                 HTML
               </Button>
-              <Button
-                onClick={() => handleDownloadReport('pdf')}
-                data-testid="download-pdf-btn"
-              >
+              <Button onClick={() => handleDownloadReport('pdf')} data-testid="download-pdf-btn">
                 <FileText className="mr-2 h-4 w-4" />
                 PDF
               </Button>
             </>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchScan}
-            data-testid="refresh-btn"
-          >
+          <Button variant="ghost" size="icon" onClick={fetchScan} data-testid="refresh-btn">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Progress */}
       {(scan.status === 'running' || scan.status === 'pending') && (
         <Card data-testid="scan-progress-card">
           <CardContent className="py-4">
@@ -207,7 +180,6 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
           { key: 'critical', count: scan.critical_count, color: 'text-[#EF4444]' },
@@ -218,11 +190,9 @@ export default function ScanDetailPage() {
         ].map(({ key, count, color }) => (
           <Card
             key={key}
-            className={`stat-${key} card-hover cursor-pointer ${
-              selectedSeverity === key ? 'ring-2 ring-primary' : ''
-            }`}
+            className={'stat-' + key + ' card-hover cursor-pointer ' + (selectedSeverity === key ? 'ring-2 ring-primary' : '')}
             onClick={() => setSelectedSeverity(selectedSeverity === key ? 'all' : key)}
-            data-testid={`stat-${key}`}
+            data-testid={'stat-' + key}
           >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -230,13 +200,12 @@ export default function ScanDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold mono ${color}`}>{count}</div>
+              <div className={'text-3xl font-bold mono ' + color}>{count}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Vulnerabilities */}
       <Card data-testid="vulnerabilities-card">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -245,11 +214,7 @@ export default function ScanDetailPage() {
               {t('vulnerabilities')} ({sortedVulnerabilities.length})
             </CardTitle>
             {selectedSeverity !== 'all' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedSeverity('all')}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setSelectedSeverity('all')}>
                 Show All
               </Button>
             )}
@@ -266,9 +231,8 @@ export default function ScanDetailPage() {
                     <div
                       key={vuln.id}
                       className="border border-border rounded-sm overflow-hidden"
-                      data-testid={`vuln-${vuln.id}`}
+                      data-testid={'vuln-' + vuln.id}
                     >
-                      {/* Header */}
                       <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
                         <Badge className={sevConfig.color}>
                           <SeverityIcon className="mr-1 h-3 w-3" />
@@ -282,16 +246,11 @@ export default function ScanDetailPage() {
                               Port {vuln.port}
                             </span>
                           )}
-                          {vuln.service && (
-                            <Badge variant="outline">{vuln.service}</Badge>
-                          )}
+                          {vuln.service && <Badge variant="outline">{vuln.service}</Badge>}
                         </div>
                       </div>
-                      {/* Body */}
                       <div className="p-4 space-y-3">
-                        <div>
-                          <p className="text-sm text-muted-foreground">{vuln.description}</p>
-                        </div>
+                        <p className="text-sm text-muted-foreground">{vuln.description}</p>
                         {vuln.solution && (
                           <div>
                             <p className="text-sm font-medium text-green-400">{t('solution')}:</p>
@@ -300,18 +259,14 @@ export default function ScanDetailPage() {
                         )}
                         <div className="flex items-center gap-4 text-sm">
                           {vuln.cve_id && (
-                            <span className="mono bg-secondary/50 px-2 py-1 rounded">
-                              {vuln.cve_id}
-                            </span>
+                            <span className="mono bg-secondary/50 px-2 py-1 rounded">{vuln.cve_id}</span>
                           )}
                           {vuln.cvss_score && (
                             <span className="text-muted-foreground">
                               CVSS: <span className="font-medium">{vuln.cvss_score}</span>
                             </span>
                           )}
-                          <span className="text-muted-foreground mono">
-                            Target: {vuln.target_value}
-                          </span>
+                          <span className="text-muted-foreground mono">Target: {vuln.target_value}</span>
                         </div>
                         {vuln.references && vuln.references.length > 0 && (
                           <div className="flex flex-wrap gap-2">
@@ -348,7 +303,6 @@ export default function ScanDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Live Terminal Output */}
       {(scan.status === 'running' || scan.status === 'pending') && (
         <Card data-testid="live-output-card">
           <CardHeader>
@@ -366,7 +320,7 @@ export default function ScanDetailPage() {
               {vulnerabilities.slice(-5).map((v, i) => (
                 <div key={i} className="terminal-line">
                   <span className="terminal-timestamp">[FOUND]</span>
-                  <span style={{ color: SEVERITY_CONFIG[v.severity]?.color?.includes('critical') ? '#EF4444' : '#22c55e' }}>
+                  <span style={{ color: v.severity === 'critical' ? '#EF4444' : '#22c55e' }}>
                     {v.severity.toUpperCase()}: {v.title}
                   </span>
                 </div>
