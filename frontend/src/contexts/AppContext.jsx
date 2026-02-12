@@ -79,32 +79,32 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const updateUser = (userData) => {
+  const updateUser = useCallback((userData) => {
     setUser(userData);
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    user,
+    token,
+    loading,
+    login,
+    register,
+    logout,
+    updateUser,
+    api,
+    isAdmin: user?.role === 'admin',
+    isReseller: user?.role === 'reseller',
+    isCustomer: user?.role === 'customer',
+  }), [user, token, loading, api, login, register, logout, updateUser]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        login,
-        register,
-        logout,
-        updateUser,
-        api,
-        isAdmin: user?.role === 'admin',
-        isReseller: user?.role === 'reseller',
-        isCustomer: user?.role === 'customer',
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
