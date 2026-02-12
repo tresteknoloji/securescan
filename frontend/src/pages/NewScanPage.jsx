@@ -61,7 +61,7 @@ export default function NewScanPage() {
   const fetchTargets = async () => {
     try {
       const response = await api.get('/targets');
-      setTargets(response.data.filter(t => t.is_active));
+      setTargets(response.data.filter(t => t.is_active !== false));
     } catch (error) {
       toast.error(t('error'));
     } finally {
