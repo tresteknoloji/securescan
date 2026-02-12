@@ -35,6 +35,16 @@
   --severity-safe: #10B981;
 }
 
+/* Hide external badges */
+[data-testid="emergent-badge"],
+.emergent-badge,
+div[class*="emergent"],
+a[href*="emergent"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
 /* Light theme */
 .light {
   --background: 0 0% 100%;
