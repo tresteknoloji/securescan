@@ -44,22 +44,12 @@ const SEVERITY_CONFIG = {
 export default function ScanDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { api, token } = useAuth();
+  const { api } = useAuth();
   const { t } = useLanguage();
   const [scan, setScan] = useState(null);
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeverity, setSelectedSeverity] = useState('all');
-
-  useEffect(() => {
-    fetchScan();
-    const interval = setInterval(() => {
-      if (scan?.status === 'running' || scan?.status === 'pending') {
-        fetchScan();
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [id, scan?.status]);
 
   const fetchScan = async () => {
     try {
@@ -76,6 +66,25 @@ export default function ScanDetailPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Auto refresh for running scans
+  useEffect(() => {
+    if (!scan || (scan.status !== 'running' && scan.status !== 'pending')) {
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      fetchScan();
+    }, 3000);
+    
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scan?.status]);
 
   const handleCancel = async () => {
     try {
