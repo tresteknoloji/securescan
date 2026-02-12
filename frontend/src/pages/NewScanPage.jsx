@@ -56,7 +56,7 @@ export default function NewScanPage() {
 
   useEffect(() => {
     fetchTargets();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTargets = async () => {
     try {
