@@ -348,23 +348,31 @@ const defaultTranslations = {
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState(localStorage.getItem('language') || 'tr');
-  const [translations, setTranslations] = useState(defaultTranslations[language]);
+  
+  const translations = useMemo(() => {
+    return defaultTranslations[language] || defaultTranslations.en;
+  }, [language]);
 
   useEffect(() => {
     localStorage.setItem('language', language);
-    setTranslations(defaultTranslations[language] || defaultTranslations.en);
   }, [language]);
 
-  const t = (key) => {
+  const t = useCallback((key) => {
     return translations[key] || key;
-  };
+  }, [translations]);
 
-  const changeLanguage = (lang) => {
+  const changeLanguage = useCallback((lang) => {
     setLanguage(lang);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    language,
+    t,
+    changeLanguage
+  }), [language, t, changeLanguage]);
 
   return (
-    <LanguageContext.Provider value={{ language, t, changeLanguage }}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );
