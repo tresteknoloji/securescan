@@ -9,8 +9,9 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 3. **Customer (Müşteri)**: Hedef ekleme, tarama başlatma, rapor indirme
 
 ## Temel Gereksinimler (Statik)
-- JWT tabanlı kimlik doğrulama
+- JWT tabanlı kimlik doğrulama (Kayıt sadece Admin/Reseller tarafından yapılır)
 - Çoklu dil desteği (TR/EN)
+- Aydınlık/Karanlık tema desteği
 - IP, domain, prefix türünde hedef yönetimi
 - Port tarama (Nmap entegrasyonu)
 - SSL/TLS güvenlik kontrolü
@@ -25,7 +26,7 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 ## Uygulanan Özellikler (2026-02-12)
 
 ### Backend (FastAPI + MongoDB)
-- ✅ JWT Authentication (login, register, me endpoints)
+- ✅ JWT Authentication (login, me endpoints)
 - ✅ User CRUD (Admin/Reseller/Customer rolleri)
 - ✅ Target CRUD (IP/Domain/Prefix)
 - ✅ Scan management (create, list, detail, cancel, delete)
@@ -38,7 +39,8 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - ✅ Translation API
 
 ### Frontend (React + Tailwind + Shadcn/UI)
-- ✅ Login/Register sayfaları
+- ✅ Landing page (kurumsal tanıtım sayfası)
+- ✅ Login sayfası (kayıt kaldırıldı)
 - ✅ Dashboard (grafikler, istatistikler, son taramalar)
 - ✅ Hedefler yönetimi sayfası
 - ✅ Taramalar listesi
@@ -48,6 +50,8 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - ✅ Kullanıcı yönetimi (Admin/Reseller)
 - ✅ Ayarlar (Branding, SMTP, CVE Database)
 - ✅ TR/EN dil değiştirme
+- ✅ Aydınlık/Karanlık tema değiştirme
+- ✅ Footer: © 2026 Tres Technology LLC
 
 ### Scanner Engine
 - ✅ Nmap port tarama entegrasyonu
@@ -71,7 +75,6 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - [ ] 2FA (İki faktörlü doğrulama)
 - [ ] API rate limiting
 - [ ] Audit log
-- [ ] Dark/Light tema seçimi
 
 ### P3 (Düşük)
 - [ ] Tarama şablonları
@@ -90,3 +93,4 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - MongoDB: localhost:27017 (MONGO_URL env variable)
 - Backend: Port 8001 with /api prefix
 - Frontend: Port 3000
+- Copyright: © 2026 Tres Technology LLC
