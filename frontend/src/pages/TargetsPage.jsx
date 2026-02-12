@@ -71,7 +71,7 @@ export default function TargetsPage() {
 
   useEffect(() => {
     fetchTargets();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchTargets = async () => {
     try {
