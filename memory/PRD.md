@@ -60,14 +60,22 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - ✅ Servis bazlı zafiyet kontrolü
 - ✅ CVE eşleştirme
 
+## Düzeltmeler (2026-02-15)
+
+### Tamamlanan Düzeltmeler
+- ✅ **Rapor İndirme Sorunu**: Token parametreli `/api/scans/{id}/report/download` endpoint'i eklendi. window.open() ile Authorization header gönderilemiyor, bu nedenle token query param olarak iletiliyor.
+- ✅ **CVE Senkronizasyonu**: `sync_cve_database` fonksiyonuna NVD API pagination desteği eklendi. Artık tüm CVE'ler (2000+ kayıt) senkronize edilebilir.
+
 ## Öncelikli Backlog
 
 ### P0 (Kritik)
+- [x] Rapor indirme "Method Not Allowed" hatası - ✅ Düzeltildi
+- [x] CVE senkronizasyonu pagination - ✅ Düzeltildi
 - [ ] Sunucuya Nmap kurulumu
-- [ ] Tarama sonrası e-posta bildirimi
 
 ### P1 (Yüksek)
 - [ ] Reseller olarak müşteri hesabına giriş
+- [ ] Tarama sonrası e-posta bildirimi
 - [ ] Tarama zamanlaması (scheduled scans)
 - [ ] Bulk hedef import (CSV)
 
