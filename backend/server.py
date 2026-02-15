@@ -544,9 +544,6 @@ async def generate_report_post(
     return await _generate_report(scan_id, format, current_user)
 
 async def _generate_report(scan_id: str, format: str, current_user: dict):
-    format: str = Query("pdf", enum=["pdf", "html"]),
-    current_user: dict = Depends(get_current_user)
-):
     """Generate report for a scan"""
     scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
     if not scan:
