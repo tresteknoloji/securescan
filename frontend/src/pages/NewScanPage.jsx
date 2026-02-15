@@ -196,8 +196,8 @@ export default function NewScanPage() {
             </CardHeader>
             <CardContent>
               {targets.length > 0 ? (
-                <ScrollArea className="h-80">
-                  <div className="space-y-2 pr-4">
+                <div className="h-80 overflow-y-auto">
+                  <div className="space-y-2 pr-2">
                     {targets.map((target) => {
                       const TypeIcon = TYPE_ICONS[target.target_type] || Server;
                       const isSelected = selectedTargets.includes(target.id);
@@ -212,10 +212,19 @@ export default function NewScanPage() {
                           }`}
                           data-testid={`target-option-${target.id}`}
                         >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => handleTargetToggle(target.id)}
-                          />
+                          <div 
+                            className="flex items-center justify-center w-4 h-4 border rounded-sm"
+                            style={{
+                              backgroundColor: isSelected ? 'hsl(var(--primary))' : 'transparent',
+                              borderColor: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))'
+                            }}
+                          >
+                            {isSelected && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
                           <TypeIcon className="h-4 w-4 text-muted-foreground" />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{target.name}</p>
@@ -230,7 +239,7 @@ export default function NewScanPage() {
                       );
                     })}
                   </div>
-                </ScrollArea>
+                </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Target className="h-12 w-12 mx-auto mb-4 opacity-30" />
