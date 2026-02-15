@@ -393,7 +393,7 @@ class VulnerabilityScanner:
 
 
 async def sync_cve_database(db, nvd_api_key: str, days_back: int = 30):
-    """Sync CVE database from NVD"""
+    """Sync CVE database from NVD with full pagination support"""
     logger.info("Starting CVE database sync from NVD...")
     
     try:
@@ -402,27 +402,52 @@ async def sync_cve_database(db, nvd_api_key: str, days_back: int = 30):
             end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=days_back)
             
-            params = {
-                "pubStartDate": start_date.strftime("%Y-%m-%dT00:00:00.000"),
-                "pubEndDate": end_date.strftime("%Y-%m-%dT23:59:59.999"),
-            }
-            
             headers = {}
             if nvd_api_key:
                 headers["apiKey"] = nvd_api_key
             
-            response = await client.get(
-                "https://services.nvd.nist.gov/rest/json/cves/2.0",
-                params=params,
-                headers=headers,
-                timeout=60
-            )
+            # NVD API returns max 2000 results per request
+            # We need to paginate through all results
+            results_per_page = 2000
+            start_index = 0
+            total_results = None
+            synced_count = 0
+            all_cves = []
             
-            if response.status_code == 200:
+            while True:
+                params = {
+                    "pubStartDate": start_date.strftime("%Y-%m-%dT00:00:00.000"),
+                    "pubEndDate": end_date.strftime("%Y-%m-%dT23:59:59.999"),
+                    "startIndex": start_index,
+                    "resultsPerPage": results_per_page
+                }
+                
+                logger.info(f"Fetching CVEs from index {start_index}...")
+                
+                response = await client.get(
+                    "https://services.nvd.nist.gov/rest/json/cves/2.0",
+                    params=params,
+                    headers=headers,
+                    timeout=120
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"NVD API error: {response.status_code}")
+                    break
+                
                 data = response.json()
+                
+                # Get total results on first request
+                if total_results is None:
+                    total_results = data.get("totalResults", 0)
+                    logger.info(f"Total CVEs to fetch: {total_results}")
+                
                 vulnerabilities = data.get("vulnerabilities", [])
                 
-                synced_count = 0
+                if not vulnerabilities:
+                    break
+                
+                # Collect all CVEs for bulk processing
                 for vuln in vulnerabilities:
                     cve = vuln.get("cve", {})
                     cve_id = cve.get("id")
@@ -464,8 +489,7 @@ async def sync_cve_database(db, nvd_api_key: str, days_back: int = 30):
                             description = desc.get("value", "")
                             break
                     
-                    # Save to database
-                    cve_entry = {
+                    all_cves.append({
                         "cve_id": cve_id,
                         "description": description[:2000] if description else "",
                         "severity": severity,
@@ -473,20 +497,35 @@ async def sync_cve_database(db, nvd_api_key: str, days_back: int = 30):
                         "published_date": cve.get("published"),
                         "modified_date": cve.get("lastModified"),
                         "synced_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    
-                    await db.cves.update_one(
-                        {"cve_id": cve_id},
-                        {"$set": cve_entry},
-                        upsert=True
-                    )
-                    synced_count += 1
+                    })
                 
-                logger.info(f"CVE sync completed. Synced {synced_count} CVEs.")
-                return {"success": True, "synced": synced_count}
-            else:
-                logger.error(f"NVD API error: {response.status_code}")
-                return {"success": False, "error": f"API returned {response.status_code}"}
+                # Update start_index for next page
+                start_index += results_per_page
+                
+                # Check if we've fetched all results
+                if start_index >= total_results:
+                    break
+                
+                # Rate limiting: NVD recommends 6 second delay without API key
+                # With API key, 0.6 second delay
+                if nvd_api_key:
+                    await asyncio.sleep(0.6)
+                else:
+                    await asyncio.sleep(6)
+            
+            # Bulk upsert all CVEs
+            logger.info(f"Saving {len(all_cves)} CVEs to database...")
+            
+            for cve_entry in all_cves:
+                await db.cves.update_one(
+                    {"cve_id": cve_entry["cve_id"]},
+                    {"$set": cve_entry},
+                    upsert=True
+                )
+                synced_count += 1
+            
+            logger.info(f"CVE sync completed. Synced {synced_count} CVEs out of {total_results} total.")
+            return {"success": True, "synced": synced_count, "total": total_results}
                 
     except Exception as e:
         logger.error(f"CVE sync error: {str(e)}")

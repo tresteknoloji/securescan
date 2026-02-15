@@ -529,9 +529,26 @@ async def get_vulnerabilities(scan_id: str, current_user: dict = Depends(get_cur
 async def generate_report_get(
     scan_id: str,
     format: str = Query("pdf", enum=["pdf", "html"]),
+    token: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user)
 ):
     """Generate report for a scan (GET method)"""
+    return await _generate_report(scan_id, format, current_user)
+
+@api_router.get("/scans/{scan_id}/report/download")
+async def download_report_direct(
+    scan_id: str,
+    format: str = Query("pdf", enum=["pdf", "html"]),
+    token: str = Query(...)
+):
+    """Download report with token in query param (for window.open)"""
+    from auth import decode_token
+    
+    try:
+        current_user = decode_token(token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
     return await _generate_report(scan_id, format, current_user)
 
 @api_router.post("/scans/{scan_id}/report")
