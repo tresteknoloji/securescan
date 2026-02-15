@@ -89,8 +89,14 @@ export default function ScanDetailPage() {
   };
 
   const handleDownloadReport = (format) => {
+    // Get token from localStorage and use download endpoint
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
     window.open(
-      process.env.REACT_APP_BACKEND_URL + '/api/scans/' + id + '/report?format=' + format,
+      process.env.REACT_APP_BACKEND_URL + '/api/scans/' + id + '/report/download?format=' + format + '&token=' + token,
       '_blank'
     );
   };
