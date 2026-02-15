@@ -525,9 +525,25 @@ async def get_vulnerabilities(scan_id: str, current_user: dict = Depends(get_cur
     return [VulnerabilityResponse(**v) for v in vulns]
 
 # ============== Report Endpoints ==============
-@api_router.post("/scans/{scan_id}/report")
-async def generate_report(
+@api_router.get("/scans/{scan_id}/report")
+async def generate_report_get(
     scan_id: str,
+    format: str = Query("pdf", enum=["pdf", "html"]),
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate report for a scan (GET method)"""
+    return await _generate_report(scan_id, format, current_user)
+
+@api_router.post("/scans/{scan_id}/report")
+async def generate_report_post(
+    scan_id: str,
+    format: str = Query("pdf", enum=["pdf", "html"]),
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate report for a scan (POST method)"""
+    return await _generate_report(scan_id, format, current_user)
+
+async def _generate_report(scan_id: str, format: str, current_user: dict):
     format: str = Query("pdf", enum=["pdf", "html"]),
     current_user: dict = Depends(get_current_user)
 ):
