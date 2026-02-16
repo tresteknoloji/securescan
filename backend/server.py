@@ -543,6 +543,18 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
             
             # Save vulnerabilities with Real Risk Score
             for vuln_data in results.get("vulnerabilities", []):
+                # Fetch CVE references from DB if cve_id exists and no references provided
+                cve_id = vuln_data.get("cve_id")
+                references = vuln_data.get("references", [])
+                
+                if cve_id and not references:
+                    cve_doc = await thread_db.cves.find_one({"cve_id": cve_id}, {"_id": 0, "references": 1})
+                    if cve_doc and cve_doc.get("references"):
+                        # Filter to only http/https references
+                        all_refs = cve_doc.get("references", [])
+                        http_refs = [r for r in all_refs if isinstance(r, str) and (r.startswith("http://") or r.startswith("https://"))]
+                        references = http_refs[:3]  # Limit to 3 references
+                
                 # Calculate Real Risk Score
                 risk_data = RiskCalculator.calculate_for_vulnerability(
                     vuln_data,
@@ -561,10 +573,10 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                     port=vuln_data.get("port"),
                     protocol=vuln_data.get("protocol"),
                     service=vuln_data.get("service"),
-                    cve_id=vuln_data.get("cve_id"),
+                    cve_id=cve_id,
                     cvss_score=vuln_data.get("cvss_score"),
                     solution=vuln_data.get("solution"),
-                    references=vuln_data.get("references", [])
+                    references=references
                 )
                 
                 vuln_dict = vuln.model_dump()
