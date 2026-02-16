@@ -318,7 +318,10 @@ export default function CVEDatabasePage() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-2 flex-wrap">
-              {Object.entries(stats.by_year).slice(0, 8).map(([year, count]) => (
+              {Object.entries(stats.by_year)
+                .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // Sort descending by year
+                .slice(0, 10)
+                .map(([year, count]) => (
                 <div
                   key={year}
                   className="bg-secondary/50 rounded-md px-4 py-2 text-center min-w-[100px]"
