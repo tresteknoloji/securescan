@@ -355,6 +355,14 @@ const defaultTranslations = {
     login_here: "Login here",
     create_account: "Create Account",
     join_platform: "Join our platform",
+    scan_history: "Scan History",
+    iteration: "Iteration",
+    current: "Current",
+    findings: "findings",
+    report_theme: "Report Theme",
+    dark: "Dark",
+    light: "Light",
+    rescan_started: "Rescan started - new iteration created",
   }
 };
 
