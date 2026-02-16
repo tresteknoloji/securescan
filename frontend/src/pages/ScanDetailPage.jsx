@@ -7,6 +7,13 @@ import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { ScrollArea } from '../components/ui/scroll-area';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
   Radar,
   ArrowLeft,
   FileText,
@@ -23,6 +30,10 @@ import {
   Fingerprint,
   Zap,
   Flame,
+  History,
+  Sun,
+  Moon,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
