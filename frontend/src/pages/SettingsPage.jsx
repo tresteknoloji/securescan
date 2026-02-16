@@ -97,6 +97,22 @@ export default function SettingsPage() {
     }
   };
 
+  const testSmtp = async () => {
+    if (!testEmail) {
+      toast.error('Please enter a test email address');
+      return;
+    }
+    setTesting(true);
+    try {
+      await api.post(`/settings/smtp/test?test_email=${encodeURIComponent(testEmail)}`);
+      toast.success(`Test email sent to ${testEmail}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send test email');
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const syncCve = async () => {
     setSyncing(true);
     try {
