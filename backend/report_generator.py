@@ -528,7 +528,8 @@ def generate_html_report(
             <div class="vuln-body">
                 <p><strong>{l['description']}:</strong> {v.get('description', 'No description available.')}</p>
                 {f"<p><strong>{l['solution']}:</strong> {v.get('solution')}</p>" if v.get('solution') else ""}
-                {f"<p><strong>{l['cve']}:</strong> <span class='target-value'>{v.get('cve_id')}</span></p>" if v.get('cve_id') else ""}
+                {f"<p><strong>{l['cve']}:</strong> <span class='target-value'>{v.get('cve_id')}</span>" + (f" | CVSS: <strong>{v.get('cvss_score')}</strong>" if v.get('cvss_score') else "") + "</p>" if v.get('cve_id') else ""}
+                {f"<p><strong>Reference:</strong> <a href='{get_first_http_reference(v.get('references', []))}' target='_blank' style='color: {branding.get('primary_color', '#3B82F6')};'>{get_first_http_reference(v.get('references', []))}</a></p>" if get_first_http_reference(v.get('references', [])) else ""}
                 <p style="color: {text_muted}; font-size: 13px;">Target: <span class="target-value">{v.get('target_value', 'N/A')}</span></p>
             </div>
         </div>
