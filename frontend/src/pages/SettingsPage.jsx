@@ -61,15 +61,6 @@ export default function SettingsPage() {
     }
   };
 
-  const fetchCveStatus = async () => {
-    try {
-      const response = await api.get('/cve/status');
-      setCveStatus(response.data);
-    } catch (error) {
-      console.error('Failed to fetch CVE status:', error);
-    }
-  };
-
   const saveBranding = async () => {
     setSaving(true);
     try {
