@@ -537,6 +537,10 @@ def generate_html_report(
             </tr>
         </table>
         
+        <!-- Discovered Ports -->
+        <h2>{l['discovered_ports']}</h2>
+        {generate_ports_section(ports_data, l, text_muted, card_bg, card_border, branding)}
+        
         <!-- Detailed Findings -->
         <h2>{l['detailed_findings']}</h2>
         
