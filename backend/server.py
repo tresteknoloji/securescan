@@ -395,20 +395,53 @@ async def create_scan(
         {"$inc": {"scans_used_this_month": 1}}
     )
     
-    # Start scan in background
-    background_tasks.add_task(run_scan, scan.id, targets, scan.config.model_dump())
+    # Start scan in a separate task (non-blocking)
+    asyncio.create_task(run_scan_wrapper(scan.id, targets, scan.config.model_dump()))
     
     return ScanResponse(**scan.model_dump())
 
-async def run_scan(scan_id: str, targets: List[dict], config: dict):
-    """Run vulnerability scan in background"""
-    try:
-        # Update scan status to running
-        await db.scans.update_one(
-            {"id": scan_id},
-            {"$set": {"status": "running", "started_at": datetime.now(timezone.utc).isoformat()}}
+async def run_scan_wrapper(scan_id: str, targets: List[dict], config: dict):
+    """Wrapper to run scan without blocking the event loop"""
+    import concurrent.futures
+    
+    loop = asyncio.get_event_loop()
+    
+    # Update status to running immediately
+    await db.scans.update_one(
+        {"id": scan_id},
+        {"$set": {"status": "running", "started_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Run the blocking scan in a thread pool executor
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        await loop.run_in_executor(
+            executor,
+            run_scan_sync,
+            scan_id,
+            targets,
+            config
         )
-        
+
+def run_scan_sync(scan_id: str, targets: List[dict], config: dict):
+    """Synchronous scan runner for thread pool execution"""
+    import asyncio
+    
+    # Create new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        loop.run_until_complete(_run_scan_async(scan_id, targets, config))
+    finally:
+        loop.close()
+
+async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
+    """Actual scan logic running in separate thread"""
+    # Create new MongoDB connection for this thread
+    thread_client = AsyncIOMotorClient(mongo_url)
+    thread_db = thread_client[os.environ['DB_NAME']]
+    
+    try:
         scanner = VulnerabilityScanner(nvd_api_key=NVD_API_KEY)
         total_targets = len(targets)
         
@@ -443,7 +476,7 @@ async def run_scan(scan_id: str, targets: List[dict], config: dict):
                 
                 vuln_dict = vuln.model_dump()
                 vuln_dict['created_at'] = vuln_dict['created_at'].isoformat()
-                await db.vulnerabilities.insert_one(vuln_dict)
+                await thread_db.vulnerabilities.insert_one(vuln_dict)
                 
                 sev = vuln_data.get("severity", "info").lower()
                 if sev in severity_counts:
@@ -452,13 +485,13 @@ async def run_scan(scan_id: str, targets: List[dict], config: dict):
             
             # Update progress
             progress = int((idx + 1) / total_targets * 100)
-            await db.scans.update_one(
+            await thread_db.scans.update_one(
                 {"id": scan_id},
                 {"$set": {"progress": progress}}
             )
         
         # Update scan as completed
-        await db.scans.update_one(
+        await thread_db.scans.update_one(
             {"id": scan_id},
             {"$set": {
                 "status": "completed",
@@ -473,10 +506,12 @@ async def run_scan(scan_id: str, targets: List[dict], config: dict):
         
     except Exception as e:
         logger.error(f"Scan {scan_id} failed: {str(e)}")
-        await db.scans.update_one(
+        await thread_db.scans.update_one(
             {"id": scan_id},
             {"$set": {"status": "failed", "completed_at": datetime.now(timezone.utc).isoformat()}}
         )
+    finally:
+        thread_client.close()
 
 @api_router.post("/scans/{scan_id}/cancel")
 async def cancel_scan(scan_id: str, current_user: dict = Depends(get_current_user)):
