@@ -532,13 +532,24 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                 config
             )
             
-            # Save vulnerabilities
+            # Get target exposure level (default to internet for external scans)
+            exposure = config.get("exposure_level", "internet")
+            data_sensitivity = config.get("data_sensitivity", "normal")
+            
+            # Save vulnerabilities with Real Risk Score
             for vuln_data in results.get("vulnerabilities", []):
+                # Calculate Real Risk Score
+                risk_data = RiskCalculator.calculate_for_vulnerability(
+                    vuln_data,
+                    exposure=exposure,
+                    data_sensitivity=data_sensitivity
+                )
+                
                 vuln = Vulnerability(
                     scan_id=scan_id,
                     target_id=target.get("id"),
                     target_value=target.get("value"),
-                    severity=vuln_data.get("severity", "info"),
+                    severity=risk_data.get("risk_level", vuln_data.get("severity", "info")),
                     title=vuln_data.get("title", "Unknown"),
                     description=vuln_data.get("description", ""),
                     port=vuln_data.get("port"),
@@ -552,11 +563,22 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                 
                 vuln_dict = vuln.model_dump()
                 vuln_dict['created_at'] = vuln_dict['created_at'].isoformat()
+                
+                # Add Real Risk data
+                vuln_dict['real_risk_score'] = risk_data.get("real_risk_score", 0)
+                vuln_dict['risk_level'] = risk_data.get("risk_level", "info")
+                vuln_dict['recommendation_priority'] = risk_data.get("recommendation_priority", 5)
+                vuln_dict['is_kev'] = risk_data.get("is_kev", False)
+                vuln_dict['is_verified'] = risk_data.get("is_verified", False)
+                vuln_dict['risk_factors'] = risk_data.get("factors_breakdown", {})
+                vuln_dict['source'] = vuln_data.get("source", "scan")
+                
                 await thread_db.vulnerabilities.insert_one(vuln_dict)
                 
-                sev = vuln_data.get("severity", "info").lower()
-                if sev in severity_counts:
-                    severity_counts[sev] += 1
+                # Count by risk_level instead of original severity
+                risk_level = risk_data.get("risk_level", "info").lower()
+                if risk_level in severity_counts:
+                    severity_counts[risk_level] += 1
                 total_vulns += 1
             
             # Update progress
@@ -566,7 +588,11 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                 {"$set": {"progress": progress}}
             )
         
-        # Update scan as completed
+        # Calculate scan risk summary
+        all_vulns = await thread_db.vulnerabilities.find({"scan_id": scan_id}, {"_id": 0}).to_list(1000)
+        risk_summary = RiskCalculator.calculate_scan_summary(all_vulns)
+        
+        # Update scan as completed with risk summary
         await thread_db.scans.update_one(
             {"id": scan_id},
             {"$set": {
@@ -574,11 +600,17 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                 "completed_at": datetime.now(timezone.utc).isoformat(),
                 "progress": 100,
                 "total_vulnerabilities": total_vulns,
+                "highest_risk_score": risk_summary.get("highest_risk_score", 0),
+                "average_risk_score": risk_summary.get("average_risk_score", 0),
+                "overall_risk_level": risk_summary.get("overall_risk_level", "info"),
+                "kev_count": risk_summary.get("kev_count", 0),
+                "verified_count": risk_summary.get("verified_count", 0),
+                "priority_1_count": risk_summary.get("priority_1_count", 0),
                 **{f"{k}_count": v for k, v in severity_counts.items()}
             }}
         )
         
-        logger.info(f"Scan {scan_id} completed with {total_vulns} vulnerabilities")
+        logger.info(f"Scan {scan_id} completed with {total_vulns} vulnerabilities, highest risk: {risk_summary.get('highest_risk_score')}")
         
         # Send email notification
         try:
