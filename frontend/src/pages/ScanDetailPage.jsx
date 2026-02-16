@@ -267,6 +267,21 @@ export default function ScanDetailPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-4 text-sm flex-wrap">
+                          {vuln.real_risk_score !== undefined && (
+                            <span className={`mono px-2 py-1 rounded font-bold ${
+                              vuln.real_risk_score >= 9 ? 'bg-red-500/20 text-red-400' :
+                              vuln.real_risk_score >= 7 ? 'bg-orange-500/20 text-orange-400' :
+                              vuln.real_risk_score >= 4 ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              Risk: {vuln.real_risk_score}
+                            </span>
+                          )}
+                          {vuln.recommendation_priority && vuln.recommendation_priority <= 2 && (
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/50">
+                              P{vuln.recommendation_priority} - Fix Now
+                            </Badge>
+                          )}
                           {vuln.cve_id && (
                             <span className="mono bg-secondary/50 px-2 py-1 rounded">{vuln.cve_id}</span>
                           )}
@@ -279,6 +294,11 @@ export default function ScanDetailPage() {
                             <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/50">
                               <Flame className="mr-1 h-3 w-3" />
                               KEV
+                            </Badge>
+                          )}
+                          {vuln.is_verified && (
+                            <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+                              Verified
                             </Badge>
                           )}
                           {vuln.source === 'active_check' && (
