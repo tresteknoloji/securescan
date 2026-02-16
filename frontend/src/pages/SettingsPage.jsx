@@ -39,7 +39,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
-    fetchCveStatus();
   }, []);
 
   const fetchSettings = async () => {
