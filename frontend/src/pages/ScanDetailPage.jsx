@@ -92,12 +92,31 @@ export default function ScanDetailPage() {
 
   const fetchVulnerabilitiesByIteration = useCallback(async (iteration) => {
     try {
-      const res = await api.get(`/scans/${id}/vulnerabilities/${iteration}`);
-      setVulnerabilities(res.data);
+      // If iteration is null or scan has no iterations, get all vulnerabilities
+      if (!iteration || !scan?.current_iteration || scan.current_iteration <= 1) {
+        const res = await api.get(`/scans/${id}/vulnerabilities`);
+        setVulnerabilities(res.data);
+      } else {
+        // Try to get vulnerabilities by iteration, fallback to all if none found
+        const res = await api.get(`/scans/${id}/vulnerabilities/${iteration}`);
+        if (res.data.length === 0) {
+          // Fallback: get all vulnerabilities (for scans without iteration data)
+          const allRes = await api.get(`/scans/${id}/vulnerabilities`);
+          setVulnerabilities(allRes.data);
+        } else {
+          setVulnerabilities(res.data);
+        }
+      }
     } catch (error) {
-      toast.error('Failed to load vulnerabilities for this iteration');
+      // Fallback to regular endpoint
+      try {
+        const res = await api.get(`/scans/${id}/vulnerabilities`);
+        setVulnerabilities(res.data);
+      } catch (fallbackError) {
+        toast.error('Failed to load vulnerabilities');
+      }
     }
-  }, [api, id]);
+  }, [api, id, scan?.current_iteration]);
 
   useEffect(() => {
     fetchScan();
