@@ -137,6 +137,89 @@ def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, 
     return ''.join(html_parts) if html_parts else f"<p style='color: {text_muted}; text-align: center; padding: 20px;'>{l.get('no_ports', 'No open ports discovered.')}</p>"
 
 
+def generate_findings_by_target(vulnerabilities: List[Dict[str, Any]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]], lang: str) -> str:
+    """Generate HTML section for findings grouped by target"""
+    if not vulnerabilities:
+        return f"<p style='color: {text_muted}; text-align: center; padding: 40px;'>{l.get('no_vulns', 'No vulnerabilities found.')}</p>"
+    
+    primary_color = branding.get('primary_color', '#3B82F6') if branding else '#3B82F6'
+    
+    # Group vulnerabilities by target
+    vulns_by_target = {}
+    for vuln in vulnerabilities:
+        target = vuln.get('target_value', 'Unknown')
+        if target not in vulns_by_target:
+            vulns_by_target[target] = []
+        vulns_by_target[target].append(vuln)
+    
+    # Sort each target's vulns by severity
+    severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+    for target in vulns_by_target:
+        vulns_by_target[target] = sorted(
+            vulns_by_target[target], 
+            key=lambda x: severity_order.get(x.get("severity", "info").lower(), 5)
+        )
+    
+    html_parts = []
+    
+    for target_value, target_vulns in vulns_by_target.items():
+        # Count by severity for this target
+        target_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for v in target_vulns:
+            sev = v.get("severity", "info").lower()
+            if sev in target_severity:
+                target_severity[sev] += 1
+        
+        # Target header with severity badges
+        severity_badges = []
+        if target_severity["critical"] > 0:
+            severity_badges.append(f'<span style="background: rgba(239,68,68,0.2); color: #EF4444; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px;">{target_severity["critical"]} {get_severity_label("critical", lang)}</span>')
+        if target_severity["high"] > 0:
+            severity_badges.append(f'<span style="background: rgba(249,115,22,0.2); color: #F97316; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px;">{target_severity["high"]} {get_severity_label("high", lang)}</span>')
+        if target_severity["medium"] > 0:
+            severity_badges.append(f'<span style="background: rgba(245,158,11,0.2); color: #F59E0B; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px;">{target_severity["medium"]} {get_severity_label("medium", lang)}</span>')
+        if target_severity["low"] > 0:
+            severity_badges.append(f'<span style="background: rgba(234,179,8,0.2); color: #EAB308; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px;">{target_severity["low"]} {get_severity_label("low", lang)}</span>')
+        if target_severity["info"] > 0:
+            severity_badges.append(f'<span style="background: rgba(59,130,246,0.2); color: #3B82F6; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px;">{target_severity["info"]} {get_severity_label("info", lang)}</span>')
+        
+        html_parts.append(f'''
+        <div style="margin-bottom: 24px;">
+            <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 8px 8px 0 0; padding: 16px; border-bottom: 2px solid {primary_color};">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; color: {primary_color};">{target_value}</span>
+                    <div>{"".join(severity_badges)}</div>
+                </div>
+            </div>
+        ''')
+        
+        # Vulnerability cards for this target
+        for v in target_vulns:
+            ref_link = get_first_http_reference(v.get('references', []))
+            html_parts.append(f'''
+            <div style="background: {card_bg}; border: 1px solid {card_border}; border-top: none; overflow: hidden;">
+                <div style="display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid {card_border};">
+                    <span style="padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; margin-right: 16px; text-transform: uppercase; background: rgba({'239,68,68' if v.get('severity','').lower()=='critical' else '249,115,22' if v.get('severity','').lower()=='high' else '245,158,11' if v.get('severity','').lower()=='medium' else '234,179,8' if v.get('severity','').lower()=='low' else '59,130,246'},0.2); color: {'#EF4444' if v.get('severity','').lower()=='critical' else '#F97316' if v.get('severity','').lower()=='high' else '#F59E0B' if v.get('severity','').lower()=='medium' else '#EAB308' if v.get('severity','').lower()=='low' else '#3B82F6'};">{get_severity_label(v.get('severity', 'info'), lang)}</span>
+                    <span style="font-size: 15px; font-weight: 600; flex: 1;">{v.get('title', 'Unknown')}</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: {text_muted};">
+                        {f"Port: {v.get('port')}" if v.get('port') else ""}
+                        {f" | {v.get('service', '')}" if v.get('service') else ""}
+                    </span>
+                </div>
+                <div style="padding: 16px;">
+                    <p style="margin-bottom: 12px; color: {text_muted};"><strong style="color: inherit;">{l['description']}:</strong> {v.get('description', 'No description available.')}</p>
+                    {f"<p style='margin-bottom: 12px; color: {text_muted};'><strong>{l['solution']}:</strong> {v.get('solution')}</p>" if v.get('solution') else ""}
+                    {f"<p style='margin-bottom: 12px;'><strong>{l['cve']}:</strong> <span style='font-family: JetBrains Mono, monospace; background: {card_border}; padding: 2px 8px; border-radius: 4px;'>{v.get('cve_id')}</span>" + (f" | CVSS: <strong>{v.get('cvss_score')}</strong>" if v.get('cvss_score') else "") + "</p>" if v.get('cve_id') else ""}
+                    {f"<p style='margin-bottom: 8px;'><strong>Reference:</strong> <a href='{ref_link}' target='_blank' style='color: {primary_color};'>{ref_link}</a></p>" if ref_link else ""}
+                </div>
+            </div>
+            ''')
+        
+        html_parts.append('</div>')
+    
+    return ''.join(html_parts)
+
+
 def generate_html_report(
     scan: Dict[str, Any],
     targets: List[Dict[str, Any]],
