@@ -147,7 +147,14 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="/cve-database" element={<CVEDatabasePage />} />
+        <Route
+          path="/cve-database"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <CVEDatabasePage />
+            </ProtectedRoute>
+          }
+        />
       </Route>
       
       {/* 404 - Redirect to landing */}
