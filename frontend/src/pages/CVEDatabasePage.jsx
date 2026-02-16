@@ -243,7 +243,7 @@ export default function CVEDatabasePage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <Card data-testid="stat-total">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -252,7 +252,7 @@ export default function CVEDatabasePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold mono text-primary">
+            <div className="text-2xl font-bold mono text-primary">
               {stats?.total_cves?.toLocaleString() || '0'}
             </div>
           </CardContent>
@@ -266,10 +266,9 @@ export default function CVEDatabasePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold mono text-orange-500">
+            <div className="text-2xl font-bold mono text-orange-500">
               {stats?.kev_count?.toLocaleString() || '0'}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{t('active_exploits')}</p>
           </CardContent>
         </Card>
         
@@ -278,7 +277,7 @@ export default function CVEDatabasePage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">{t('critical')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold mono text-red-500">
+            <div className="text-2xl font-bold mono text-red-500">
               {stats?.severity_counts?.critical?.toLocaleString() || '0'}
             </div>
           </CardContent>
@@ -289,7 +288,7 @@ export default function CVEDatabasePage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">{t('high')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold mono text-orange-400">
+            <div className="text-2xl font-bold mono text-orange-400">
               {stats?.severity_counts?.high?.toLocaleString() || '0'}
             </div>
           </CardContent>
@@ -300,8 +299,30 @@ export default function CVEDatabasePage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">{t('medium')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold mono text-yellow-500">
+            <div className="text-2xl font-bold mono text-yellow-500">
               {stats?.severity_counts?.medium?.toLocaleString() || '0'}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-green-500/30" data-testid="stat-low">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('low')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mono text-green-500">
+              {stats?.severity_counts?.low?.toLocaleString() || '0'}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-blue-500/30" data-testid="stat-info">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('info')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mono text-blue-500">
+              {stats?.severity_counts?.info?.toLocaleString() || '0'}
             </div>
           </CardContent>
         </Card>
