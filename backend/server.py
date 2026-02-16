@@ -503,6 +503,12 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
         
         logger.info(f"Scan {scan_id} completed with {total_vulns} vulnerabilities")
         
+        # Send email notification
+        try:
+            await send_scan_complete_email(thread_db, scan_id, severity_counts, total_vulns)
+        except Exception as email_error:
+            logger.error(f"Failed to send scan complete email: {email_error}")
+        
     except Exception as e:
         logger.error(f"Scan {scan_id} failed: {str(e)}")
         await thread_db.scans.update_one(
