@@ -104,7 +104,7 @@ class VulnerabilityScanner:
                 results["vulnerabilities"].extend(ssl_results.get("vulnerabilities", []))
             
             # Check for common vulnerabilities based on services (legacy)
-            if config.get("check_cve", True) and not self.detection_engine:
+            if config.get("check_cve", True) and self.detection_engine is None:
                 cve_vulns = await self._check_service_vulnerabilities(results["ports"])
                 results["vulnerabilities"].extend(cve_vulns)
             
