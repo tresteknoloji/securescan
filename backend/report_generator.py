@@ -67,6 +67,8 @@ def generate_html_report(
         border_color = "#E2E8F0"
         card_bg = "#FFFFFF"
         card_border = "#E2E8F0"
+        cover_bg = "linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%)"
+        terminal_bg = "#F1F5F9"
     else:  # dark
         bg_color = "#0F172A"
         bg_secondary = "#1E293B"
@@ -75,6 +77,8 @@ def generate_html_report(
         border_color = "#334155"
         card_bg = "#1E293B"
         card_border = "#334155"
+        cover_bg = "linear-gradient(135deg, #020617 0%, #0F172A 100%)"
+        terminal_bg = "#0F172A"
     
     # Default branding
     if not branding:
@@ -103,6 +107,10 @@ def generate_html_report(
     
     total_vulns = sum(severity_counts.values())
     
+    # Get iteration info
+    report_iteration = scan.get('report_iteration', scan.get('current_iteration', 1))
+    total_iterations = scan.get('current_iteration', 1)
+    
     # Labels based on language
     labels = {
         "en": {
@@ -125,7 +133,9 @@ def generate_html_report(
             "pci_compliance": "PCI Compliance",
             "compliant": "COMPLIANT",
             "non_compliant": "NON-COMPLIANT",
-            "pci_note": "PCI DSS compliance requires no Critical or High severity vulnerabilities."
+            "pci_note": "PCI DSS compliance requires no Critical or High severity vulnerabilities.",
+            "iteration": "Iteration",
+            "of": "of"
         },
         "tr": {
             "title": "Zafiyet Tarama Raporu",
@@ -147,7 +157,9 @@ def generate_html_report(
             "pci_compliance": "PCI Uyumluluk",
             "compliant": "UYUMLU",
             "non_compliant": "UYUMSUZ",
-            "pci_note": "PCI DSS uyumluluğu için Kritik veya Yüksek seviye zafiyet bulunmamalıdır."
+            "pci_note": "PCI DSS uyumluluğu için Kritik veya Yüksek seviye zafiyet bulunmamalıdır.",
+            "iteration": "Yineleme",
+            "of": "/"
         }
     }
     
@@ -182,8 +194,8 @@ def generate_html_report(
         
         body {{
             font-family: 'Manrope', sans-serif;
-            background: #020617;
-            color: #F8FAFC;
+            background: {bg_color};
+            color: {text_color};
             line-height: 1.6;
         }}
         
@@ -193,7 +205,7 @@ def generate_html_report(
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, #020617 0%, #0F172A 100%);
+            background: {cover_bg};
             padding: 40px;
             page-break-after: always;
         }}
@@ -215,19 +227,30 @@ def generate_html_report(
         
         .cover-subtitle {{
             font-size: 24px;
-            color: #94A3B8;
+            color: {text_muted};
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
+        }}
+        
+        .cover-iteration {{
+            font-size: 16px;
+            color: {text_muted};
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 8px 20px;
+            background: {card_bg};
+            border-radius: 20px;
+            border: 1px solid {card_border};
         }}
         
         .cover-date {{
             font-size: 18px;
-            color: #64748B;
+            color: {text_muted};
         }}
         
         .company-name {{
             font-size: 20px;
-            color: #F8FAFC;
+            color: {text_color};
             margin-top: 60px;
         }}
         
@@ -257,11 +280,11 @@ def generate_html_report(
         }}
         
         .summary-card {{
-            background: #0F172A;
+            background: {card_bg};
             border-radius: 8px;
             padding: 20px;
             text-align: center;
-            border: 1px solid #1E293B;
+            border: 1px solid {card_border};
         }}
         
         .summary-card.critical {{ border-top: 4px solid #EF4444; }}
@@ -278,7 +301,7 @@ def generate_html_report(
         
         .summary-label {{
             font-size: 14px;
-            color: #94A3B8;
+            color: {text_muted};
             text-transform: uppercase;
         }}
         
@@ -289,11 +312,11 @@ def generate_html_report(
         
         .details-table td {{
             padding: 12px 16px;
-            border-bottom: 1px solid #1E293B;
+            border-bottom: 1px solid {card_border};
         }}
         
         .details-table td:first-child {{
-            color: #94A3B8;
+            color: {text_muted};
             width: 200px;
         }}
         
@@ -318,10 +341,10 @@ def generate_html_report(
         }}
         
         .vuln-card {{
-            background: #0F172A;
+            background: {card_bg};
             border-radius: 8px;
             margin-bottom: 16px;
-            border: 1px solid #1E293B;
+            border: 1px solid {card_border};
             overflow: hidden;
         }}
         
@@ -329,7 +352,7 @@ def generate_html_report(
             display: flex;
             align-items: center;
             padding: 16px;
-            border-bottom: 1px solid #1E293B;
+            border-bottom: 1px solid {card_border};
         }}
         
         .severity-badge {{
@@ -356,7 +379,7 @@ def generate_html_report(
         .vuln-meta {{
             font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
-            color: #64748B;
+            color: {text_muted};
         }}
         
         .vuln-body {{
@@ -365,16 +388,16 @@ def generate_html_report(
         
         .vuln-body p {{
             margin-bottom: 12px;
-            color: #CBD5E1;
+            color: {text_muted};
         }}
         
         .vuln-body strong {{
-            color: #F8FAFC;
+            color: {text_color};
         }}
         
         .target-value {{
             font-family: 'JetBrains Mono', monospace;
-            background: #1E293B;
+            background: {bg_secondary};
             padding: 2px 8px;
             border-radius: 4px;
             font-size: 13px;
@@ -383,20 +406,15 @@ def generate_html_report(
         .footer {{
             text-align: center;
             padding: 40px;
-            color: #64748B;
+            color: {text_muted};
             font-size: 14px;
-            border-top: 1px solid #1E293B;
+            border-top: 1px solid {card_border};
             margin-top: 40px;
         }}
         
         @media print {{
-            body {{
-                background: white;
-                color: #1E293B;
-            }}
-            
             .cover-page {{
-                background: white;
+                page-break-after: always;
             }}
             
             .container {{
@@ -415,9 +433,10 @@ def generate_html_report(
         {"<img src='" + branding.get('logo_url') + "' alt='Logo' class='logo' />" if branding.get('logo_url') else ""}
         <h1 class="cover-title">{l['title']}</h1>
         <p class="cover-subtitle">{scan.get('name', 'Vulnerability Scan')}</p>
+        <p class="cover-iteration">{l['iteration']} {report_iteration} {l['of']} {total_iterations}</p>
         <p class="cover-date">{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</p>
         <p class="company-name">{branding.get('company_name', 'Vulnerability Scanner')}</p>
-        {f"<p style='margin-top: 20px; color: #64748B;'>{branding.get('report_header_text', '')}</p>" if branding.get('report_header_text') else ""}
+        {f"<p style='margin-top: 20px; color: {text_muted};'>{branding.get('report_header_text', '')}</p>" if branding.get('report_header_text') else ""}
     </div>
     
     <!-- Executive Summary -->
@@ -455,6 +474,10 @@ def generate_html_report(
                 <td>{scan.get('name', 'N/A')}</td>
             </tr>
             <tr>
+                <td>{l['iteration']}</td>
+                <td>{report_iteration} {l['of']} {total_iterations}</td>
+            </tr>
+            <tr>
                 <td>{l['scan_date']}</td>
                 <td>{scan.get('created_at', datetime.now(timezone.utc).isoformat())[:19].replace('T', ' ')} UTC</td>
             </tr>
@@ -472,7 +495,7 @@ def generate_html_report(
                     <span class="pci-badge {'pci-compliant' if pci_compliant else 'pci-non-compliant'}">
                         {l['compliant'] if pci_compliant else l['non_compliant']}
                     </span>
-                    <br><small style="color: #64748B;">{l['pci_note']}</small>
+                    <br><small style="color: {text_muted};">{l['pci_note']}</small>
                 </td>
             </tr>
         </table>
@@ -480,7 +503,7 @@ def generate_html_report(
         <!-- Detailed Findings -->
         <h2>{l['detailed_findings']}</h2>
         
-        {"<p style='color: #64748B; text-align: center; padding: 40px;'>" + l['no_vulns'] + "</p>" if not sorted_vulns else ""}
+        {"<p style='color: " + text_muted + "; text-align: center; padding: 40px;'>" + l['no_vulns'] + "</p>" if not sorted_vulns else ""}
         
         {"".join([f'''
         <div class="vuln-card">
@@ -496,7 +519,7 @@ def generate_html_report(
                 <p><strong>{l['description']}:</strong> {v.get('description', 'No description available.')}</p>
                 {f"<p><strong>{l['solution']}:</strong> {v.get('solution')}</p>" if v.get('solution') else ""}
                 {f"<p><strong>{l['cve']}:</strong> <span class='target-value'>{v.get('cve_id')}</span></p>" if v.get('cve_id') else ""}
-                <p style="color: #64748B; font-size: 13px;">Target: <span class="target-value">{v.get('target_value', 'N/A')}</span></p>
+                <p style="color: {text_muted}; font-size: 13px;">Target: <span class="target-value">{v.get('target_value', 'N/A')}</span></p>
             </div>
         </div>
         ''' for v in sorted_vulns])}
