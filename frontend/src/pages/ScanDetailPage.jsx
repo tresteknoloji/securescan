@@ -266,7 +266,7 @@ export default function ScanDetailPage() {
                             <p className="text-sm text-muted-foreground">{vuln.solution}</p>
                           </div>
                         )}
-                        <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-4 text-sm flex-wrap">
                           {vuln.cve_id && (
                             <span className="mono bg-secondary/50 px-2 py-1 rounded">{vuln.cve_id}</span>
                           )}
@@ -274,6 +274,24 @@ export default function ScanDetailPage() {
                             <span className="text-muted-foreground">
                               CVSS: <span className="font-medium">{vuln.cvss_score}</span>
                             </span>
+                          )}
+                          {vuln.is_kev && (
+                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/50">
+                              <Flame className="mr-1 h-3 w-3" />
+                              KEV
+                            </Badge>
+                          )}
+                          {vuln.source === 'active_check' && (
+                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50">
+                              <Zap className="mr-1 h-3 w-3" />
+                              Active Check
+                            </Badge>
+                          )}
+                          {vuln.source === 'cpe_match' && (
+                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">
+                              <Fingerprint className="mr-1 h-3 w-3" />
+                              CPE Match
+                            </Badge>
                           )}
                           <span className="text-muted-foreground mono">Target: {vuln.target_value}</span>
                         </div>
