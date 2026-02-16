@@ -370,14 +370,38 @@ export default function SettingsPage() {
                 </div>
               </div>
               
-              <Button onClick={saveSmtp} disabled={saving} data-testid="save-smtp-btn">
-                {saving ? (
-                  <Loader2 className="mr-2 h-4 w-4 spinner" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                {t('save')}
-              </Button>
+              <div className="flex flex-wrap gap-4">
+                <Button onClick={saveSmtp} disabled={saving} data-testid="save-smtp-btn">
+                  {saving ? (
+                    <Loader2 className="mr-2 h-4 w-4 spinner" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  {t('save')}
+                </Button>
+                
+                <div className="flex gap-2 flex-1 max-w-md">
+                  <Input
+                    placeholder="test@example.com"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    data-testid="test-email-input"
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={testSmtp} 
+                    disabled={testing || !smtp.host}
+                    data-testid="test-smtp-btn"
+                  >
+                    {testing ? (
+                      <Loader2 className="mr-2 h-4 w-4 spinner" />
+                    ) : (
+                      <Mail className="mr-2 h-4 w-4" />
+                    )}
+                    Test
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
