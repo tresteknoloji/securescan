@@ -62,6 +62,9 @@ export default function ScanDetailPage() {
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeverity, setSelectedSeverity] = useState('all');
+  const [selectedIteration, setSelectedIteration] = useState(null);
+  const [iterationHistory, setIterationHistory] = useState([]);
+  const [reportTheme, setReportTheme] = useState('dark');
 
   const fetchScan = useCallback(async () => {
     try {
@@ -71,13 +74,30 @@ export default function ScanDetailPage() {
       ]);
       setScan(scanRes.data);
       setVulnerabilities(vulnRes.data);
+      
+      // Set default iteration to current
+      if (selectedIteration === null) {
+        setSelectedIteration(scanRes.data.current_iteration || 1);
+      }
+      
+      // Fetch iteration history
+      setIterationHistory(scanRes.data.iteration_history || []);
     } catch (error) {
       toast.error('Failed to load scan');
       navigate('/scans');
     } finally {
       setLoading(false);
     }
-  }, [api, id, navigate]);
+  }, [api, id, navigate, selectedIteration]);
+
+  const fetchVulnerabilitiesByIteration = useCallback(async (iteration) => {
+    try {
+      const res = await api.get(`/scans/${id}/vulnerabilities/${iteration}`);
+      setVulnerabilities(res.data);
+    } catch (error) {
+      toast.error('Failed to load vulnerabilities for this iteration');
+    }
+  }, [api, id]);
 
   useEffect(() => {
     fetchScan();
@@ -92,6 +112,13 @@ export default function ScanDetailPage() {
     return () => clearInterval(interval);
   }, [scan, fetchScan]);
 
+  // When iteration changes, fetch vulnerabilities for that iteration
+  useEffect(() => {
+    if (selectedIteration && scan) {
+      fetchVulnerabilitiesByIteration(selectedIteration);
+    }
+  }, [selectedIteration, scan, fetchVulnerabilitiesByIteration]);
+
   const handleCancel = async () => {
     try {
       await api.post('/scans/' + id + '/cancel');
@@ -103,45 +130,25 @@ export default function ScanDetailPage() {
   };
 
   const handleDownloadReport = (format) => {
-    // Get token from localStorage and use download endpoint
+    // Get token from localStorage and use download endpoint with iteration and theme
     const token = localStorage.getItem('token');
     if (!token) {
       toast.error('Authentication required');
       return;
     }
+    const iteration = selectedIteration || scan?.current_iteration || 1;
     window.open(
-      process.env.REACT_APP_BACKEND_URL + '/api/scans/' + id + '/report/download?format=' + format + '&token=' + token,
+      `${process.env.REACT_APP_BACKEND_URL}/api/scans/${id}/report/download?format=${format}&iteration=${iteration}&theme=${reportTheme}&token=${token}`,
       '_blank'
     );
   };
 
   const handleRescan = async () => {
     try {
-      // Get original scan's target IDs and config
-      const targetIds = scan.target_ids || [];
-      
-      if (targetIds.length === 0) {
-        toast.error('No targets found for rescan');
-        return;
-      }
-      
-      const newScanData = {
-        name: `${scan.name} (Repeat)`,
-        target_ids: targetIds,
-        config: scan.config || {
-          scan_type: 'quick',
-          port_range: '1-1000',
-          check_ssl: true,
-          check_cve: true,
-          active_checks: true,
-          exposure_level: 'internet',
-          data_sensitivity: 'normal',
-        }
-      };
-      
-      const response = await api.post('/scans', newScanData);
-      toast.success('Rescan started');
-      navigate(`/scans/${response.data.id}`);
+      // Use the new rescan endpoint that creates iteration
+      await api.post(`/scans/${id}/rescan`);
+      toast.success(t('rescan_started') || 'Rescan started - new iteration created');
+      fetchScan();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to start rescan');
     }
