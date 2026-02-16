@@ -14,8 +14,10 @@ export default function SettingsPage() {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [cveStatus, setCveStatus] = useState(null);
+  const [testEmail, setTestEmail] = useState('');
   
   const [branding, setBranding] = useState({
     company_name: '',
