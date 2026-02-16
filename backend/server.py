@@ -904,6 +904,18 @@ async def _generate_report(scan_id: str, format: str, iteration: Optional[int], 
             {"_id": 0}
         ).to_list(10000)
     
+    # Get discovered ports - try with iteration first, fallback to all
+    ports_data = await db.scan_ports.find(
+        {"scan_id": scan_id, "iteration": target_iteration},
+        {"_id": 0}
+    ).to_list(100)
+    
+    if not ports_data:
+        ports_data = await db.scan_ports.find(
+            {"scan_id": scan_id},
+            {"_id": 0}
+        ).to_list(100)
+    
     # Get branding
     user = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
     reseller_id = user.get('parent_id') or user.get('id')
@@ -916,10 +928,10 @@ async def _generate_report(scan_id: str, format: str, iteration: Optional[int], 
     scan_for_report['report_iteration'] = target_iteration
     
     if format == "html":
-        html = generate_html_report(scan_for_report, targets, vulns, branding, lang, theme)
+        html = generate_html_report(scan_for_report, targets, vulns, branding, lang, theme, ports_data)
         return HTMLResponse(content=html)
     else:
-        pdf_bytes = await generate_pdf_report(scan_for_report, targets, vulns, branding, lang, theme)
+        pdf_bytes = await generate_pdf_report(scan_for_report, targets, vulns, branding, lang, theme, ports_data)
         # Return directly without saving to disk (on-demand generation)
         from fastapi.responses import Response
         return Response(
