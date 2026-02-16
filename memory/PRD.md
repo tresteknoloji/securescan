@@ -25,6 +25,16 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 
 ## Düzeltmeler ve Geliştirmeler (2026-02-16)
 
+### Email Bildirimleri - ✅ TAMAMLANDI
+- ✅ **Tarama Tamamlandığında Email**: Scan bitince owner'a otomatik mail
+- ✅ **Hiyerarşik SMTP Seçimi**:
+  - Customer → Reseller'ın SMTP'si
+  - Admin'in müşterisi → Admin'in SMTP'si
+  - Admin/Reseller kendi taraması → Kendi SMTP'si
+  - Fallback: Admin SMTP (reseller SMTP yoksa)
+- ✅ **SMTP Test Endpoint**: `/api/settings/smtp/test` - Test mail gönderme
+- ✅ **Admin Genel SMTP**: `reseller_id: "admin"` olarak kaydedilir
+
 ### Faz 2: Detection Engine - ✅ TAMAMLANDI
 - ✅ **Fingerprint Engine**: HTTP/HTTPS servis tespiti
   - Server header parsing (Apache, Nginx, IIS, Tomcat, etc.)
