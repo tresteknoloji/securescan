@@ -137,7 +137,11 @@ class Scan(BaseModel):
     completed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utc_now)
     
-    # Summary counts
+    # Iteration tracking
+    current_iteration: int = 1
+    iteration_history: List[dict] = Field(default_factory=list)
+    
+    # Summary counts (for current iteration)
     total_vulnerabilities: int = 0
     critical_count: int = 0
     high_count: int = 0
@@ -161,6 +165,8 @@ class ScanResponse(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime
+    current_iteration: int = 1
+    iteration_history: List[dict] = Field(default_factory=list)
     total_vulnerabilities: int = 0
     critical_count: int = 0
     high_count: int = 0
