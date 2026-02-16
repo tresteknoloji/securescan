@@ -646,12 +646,13 @@ async def generate_pdf_report(
     vulnerabilities: List[Dict[str, Any]],
     branding: Optional[Dict[str, Any]] = None,
     lang: str = "en",
-    theme: str = "dark"
+    theme: str = "dark",
+    ports_data: Optional[List[Dict[str, Any]]] = None
 ) -> bytes:
     """Generate PDF report from HTML with theme support"""
     from weasyprint import HTML, CSS
     
-    html_content = generate_html_report(scan, targets, vulnerabilities, branding, lang, theme)
+    html_content = generate_html_report(scan, targets, vulnerabilities, branding, lang, theme, ports_data)
     
     try:
         pdf_bytes = HTML(string=html_content).write_pdf()
