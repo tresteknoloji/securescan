@@ -23,6 +23,25 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - Reseller bazlı SMTP yapılandırması
 - Kullanıcı limitleri (hedef sayısı, aylık tarama hakkı, müşteri sayısı)
 
+## Düzeltmeler ve Geliştirmeler (2026-02-16)
+
+### Faz 1: CVE Altyapısı - ✅ TAMAMLANDI
+- ✅ **Tam CVE Senkronizasyonu**: NVD API ile pagination destekli tam veritabanı sync
+- ✅ **CISA KEV Entegrasyonu**: Aktif exploit edilen zafiyetler (1518 KEV)
+- ✅ **Incremental Update**: Son X günün CVE'lerini güncelleme
+- ✅ **CVE Arama API**: Severity, year, KEV status filtreleme
+- ✅ **CVE Database Sayfası**: İstatistikler, arama, detay görüntüleme
+
+### Önceki Düzeltmeler (2026-02-15)
+- ✅ **Rapor İndirme**: Token parametreli download endpoint
+- ✅ **Arka Plan Tarama**: ThreadPool ile non-blocking scan
+- ✅ **PDF Rapor**: WeasyPrint sistem bağımlılıkları
+
+## Mevcut CVE Veritabanı Durumu
+- **Total CVEs**: 8,977 (son 30 gün sync)
+- **CISA KEV**: 36 aktif exploit edilen
+- **Full Sync**: 240,000+ CVE için "Full Sync" butonu mevcut
+
 ## Uygulanan Özellikler (2026-02-12)
 
 ### Backend (FastAPI + MongoDB)
