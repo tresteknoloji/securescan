@@ -104,6 +104,38 @@ export default function ScanDetailPage() {
     );
   };
 
+  const handleRescan = async () => {
+    try {
+      // Get original scan's target IDs and config
+      const targetIds = scan.targets?.map(t => t.id) || [];
+      
+      if (targetIds.length === 0) {
+        toast.error('No targets found for rescan');
+        return;
+      }
+      
+      const newScanData = {
+        name: `${scan.name} (Repeat)`,
+        target_ids: targetIds,
+        config: scan.config || {
+          scan_type: 'quick',
+          port_range: '1-1000',
+          check_ssl: true,
+          check_cve: true,
+          active_checks: true,
+          exposure_level: 'internet',
+          data_sensitivity: 'normal',
+        }
+      };
+      
+      const response = await api.post('/scans', newScanData);
+      toast.success('Rescan started');
+      navigate(`/scans/${response.data.id}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to start rescan');
+    }
+  };
+
   const filteredVulnerabilities = vulnerabilities.filter(
     (v) => selectedSeverity === 'all' || v.severity === selectedSeverity
   );
