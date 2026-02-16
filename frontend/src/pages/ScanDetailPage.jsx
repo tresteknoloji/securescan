@@ -133,8 +133,12 @@ export default function ScanDetailPage() {
 
   // When iteration changes, fetch vulnerabilities for that iteration
   useEffect(() => {
-    if (selectedIteration && scan) {
-      fetchVulnerabilitiesByIteration(selectedIteration);
+    if (scan) {
+      // Only use iteration-based fetch if scan has multiple iterations
+      if (selectedIteration && scan.current_iteration && scan.current_iteration > 1) {
+        fetchVulnerabilitiesByIteration(selectedIteration);
+      }
+      // Otherwise, vulnerabilities are already loaded in fetchScan
     }
   }, [selectedIteration, scan, fetchVulnerabilitiesByIteration]);
 
