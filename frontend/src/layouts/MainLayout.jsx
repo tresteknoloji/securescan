@@ -27,6 +27,7 @@ import {
   Menu,
   Moon,
   Sun,
+  Database,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -35,6 +36,7 @@ const navItems = [
   { key: 'targets', icon: Target, path: '/targets', roles: ['admin', 'reseller', 'customer'] },
   { key: 'scans', icon: Radar, path: '/scans', roles: ['admin', 'reseller', 'customer'] },
   { key: 'reports', icon: FileText, path: '/reports', roles: ['admin', 'reseller', 'customer'] },
+  { key: 'cve_database', icon: Database, path: '/cve-database', roles: ['admin', 'reseller', 'customer'] },
   { key: 'users', icon: Users, path: '/users', roles: ['admin', 'reseller'] },
   { key: 'settings', icon: Settings, path: '/settings', roles: ['admin', 'reseller'] },
 ];
