@@ -267,6 +267,60 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
+      {/* Iteration Selector */}
+      {scan.current_iteration > 1 && (
+        <Card data-testid="iteration-selector-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <History className="h-5 w-5" />
+              {t('scan_history') || 'Tarama Geçmişi'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{t('iteration') || 'Yineleme'}:</span>
+                <Select
+                  value={String(selectedIteration)}
+                  onValueChange={(val) => setSelectedIteration(parseInt(val))}
+                >
+                  <SelectTrigger className="w-[180px]" data-testid="iteration-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Current iteration */}
+                    <SelectItem value={String(scan.current_iteration)}>
+                      #{scan.current_iteration} - {t('current') || 'Güncel'} ({scan.status})
+                    </SelectItem>
+                    {/* Previous iterations from history */}
+                    {iterationHistory.map((hist) => (
+                      <SelectItem key={hist.iteration} value={String(hist.iteration)}>
+                        #{hist.iteration} - {new Date(hist.completed_at).toLocaleDateString()} ({hist.total_vulnerabilities} {t('vulnerabilities') || 'zafiyet'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedIteration && selectedIteration !== scan.current_iteration && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {iterationHistory.find(h => h.iteration === selectedIteration) && (
+                    <>
+                      <Badge variant="outline">
+                        {iterationHistory.find(h => h.iteration === selectedIteration)?.total_vulnerabilities || 0} {t('findings') || 'bulgu'}
+                      </Badge>
+                      <span>
+                        {new Date(iterationHistory.find(h => h.iteration === selectedIteration)?.completed_at).toLocaleString()}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
           { key: 'critical', count: scan.critical_count, color: 'text-[#EF4444]' },
