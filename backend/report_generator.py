@@ -74,17 +74,25 @@ def get_protocol_color(protocol: str) -> str:
     return colors.get(protocol.lower(), "#64748B")
 
 
-def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]] = None) -> str:
+def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]] = None, targets: Optional[List[Dict[str, Any]]] = None) -> str:
     """Generate HTML section for discovered ports"""
     if not ports_data:
         return f"<p style='color: {text_muted}; text-align: center; padding: 20px;'>{l.get('no_ports', 'No open ports discovered.')}</p>"
     
     primary_color = branding.get('primary_color', '#3B82F6') if branding else '#3B82F6'
     
+    # Create a map of target_value to target_name
+    target_names = {}
+    if targets:
+        for t in targets:
+            target_names[t.get('value', '')] = t.get('name', '')
+    
     html_parts = []
     
     for port_record in ports_data:
         target_value = port_record.get('target_value', 'Unknown')
+        target_name = target_names.get(target_value, '')
+        target_display = f"{target_value}" + (f" ({target_name})" if target_name and target_name != target_value else "")
         ports = port_record.get('ports', [])
         
         if not ports:
@@ -93,7 +101,7 @@ def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, 
         html_parts.append(f'''
         <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 8px; margin-bottom: 16px; overflow: hidden;">
             <div style="padding: 12px 16px; border-bottom: 1px solid {card_border}; font-weight: 600;">
-                <span style="font-family: 'JetBrains Mono', monospace; color: {primary_color};">{target_value}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; color: {primary_color};">{target_display}</span>
                 <span style="color: {text_muted}; font-size: 14px; margin-left: 10px;">({len(ports)} {l.get('open_ports', 'open ports').lower()})</span>
             </div>
             <div style="padding: 16px;">
