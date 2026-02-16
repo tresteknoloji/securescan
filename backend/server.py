@@ -535,6 +535,7 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
             # Get target exposure level (default to internet for external scans)
             exposure = config.get("exposure_level", "internet")
             data_sensitivity = config.get("data_sensitivity", "normal")
+            iteration = config.get("iteration", 1)
             
             # Save vulnerabilities with Real Risk Score
             for vuln_data in results.get("vulnerabilities", []):
@@ -547,6 +548,7 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                 
                 vuln = Vulnerability(
                     scan_id=scan_id,
+                    iteration=iteration,
                     target_id=target.get("id"),
                     target_value=target.get("value"),
                     severity=risk_data.get("risk_level", vuln_data.get("severity", "info")),
