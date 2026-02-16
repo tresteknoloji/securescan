@@ -201,7 +201,7 @@ export default function ScanDetailPage() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {scan.status === 'running' && (
             <Button variant="outline" onClick={handleCancel} data-testid="cancel-scan-btn">
               <StopCircle className="mr-2 h-4 w-4" />
@@ -210,12 +210,34 @@ export default function ScanDetailPage() {
           )}
           {scan.status === 'completed' && (
             <>
+              {/* Report Theme Selector */}
+              <div className="flex items-center gap-2 px-3 py-1 border rounded-md bg-card" data-testid="theme-selector">
+                <span className="text-sm text-muted-foreground">{t('report_theme') || 'Tema'}:</span>
+                <Button
+                  variant={reportTheme === 'dark' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setReportTheme('dark')}
+                  className="h-7 px-2"
+                >
+                  <Moon className="h-3 w-3 mr-1" />
+                  {t('dark') || 'Koyu'}
+                </Button>
+                <Button
+                  variant={reportTheme === 'light' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setReportTheme('light')}
+                  className="h-7 px-2"
+                >
+                  <Sun className="h-3 w-3 mr-1" />
+                  {t('light') || 'Açık'}
+                </Button>
+              </div>
               <Button variant="outline" onClick={() => handleDownloadReport('html')} data-testid="download-html-btn">
                 <FileText className="mr-2 h-4 w-4" />
                 HTML
               </Button>
               <Button onClick={() => handleDownloadReport('pdf')} data-testid="download-pdf-btn">
-                <FileText className="mr-2 h-4 w-4" />
+                <Download className="mr-2 h-4 w-4" />
                 PDF
               </Button>
             </>
