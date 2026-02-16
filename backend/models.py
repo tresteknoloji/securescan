@@ -376,6 +376,9 @@ TRANSLATIONS = {
         "quick_scan": "Hızlı Tarama",
         "full_scan": "Tam Tarama",
         "stealth_scan": "Gizli Tarama",
+        "cve_database": "CVE Veritabanı",
+        "solution": "Çözüm",
+        "live_results": "Canlı Sonuçlar",
     },
     "en": {
         "dashboard": "Dashboard",
