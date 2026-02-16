@@ -107,7 +107,7 @@ export default function ScanDetailPage() {
   const handleRescan = async () => {
     try {
       // Get original scan's target IDs and config
-      const targetIds = scan.targets?.map(t => t.id) || [];
+      const targetIds = scan.target_ids || [];
       
       if (targetIds.length === 0) {
         toast.error('No targets found for rescan');
