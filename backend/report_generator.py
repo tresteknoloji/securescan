@@ -137,12 +137,18 @@ def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, 
     return ''.join(html_parts) if html_parts else f"<p style='color: {text_muted}; text-align: center; padding: 20px;'>{l.get('no_ports', 'No open ports discovered.')}</p>"
 
 
-def generate_findings_by_target(vulnerabilities: List[Dict[str, Any]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]], lang: str) -> str:
+def generate_findings_by_target(vulnerabilities: List[Dict[str, Any]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]], lang: str, targets: Optional[List[Dict[str, Any]]] = None) -> str:
     """Generate HTML section for findings grouped by target"""
     if not vulnerabilities:
         return f"<p style='color: {text_muted}; text-align: center; padding: 40px;'>{l.get('no_vulns', 'No vulnerabilities found.')}</p>"
     
     primary_color = branding.get('primary_color', '#3B82F6') if branding else '#3B82F6'
+    
+    # Create a map of target_value to target_name
+    target_names = {}
+    if targets:
+        for t in targets:
+            target_names[t.get('value', '')] = t.get('name', '')
     
     # Group vulnerabilities by target
     vulns_by_target = {}
@@ -163,6 +169,10 @@ def generate_findings_by_target(vulnerabilities: List[Dict[str, Any]], l: dict, 
     html_parts = []
     
     for target_value, target_vulns in vulns_by_target.items():
+        # Get target name
+        target_name = target_names.get(target_value, '')
+        target_display = f"{target_value}" + (f" ({target_name})" if target_name and target_name != target_value else "")
+        
         # Count by severity for this target
         target_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
         for v in target_vulns:
@@ -187,7 +197,7 @@ def generate_findings_by_target(vulnerabilities: List[Dict[str, Any]], l: dict, 
         <div style="margin-bottom: 24px;">
             <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 8px 8px 0 0; padding: 16px; border-bottom: 2px solid {primary_color};">
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; color: {primary_color};">{target_value}</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; color: {primary_color};">{target_display}</span>
                     <div>{"".join(severity_badges)}</div>
                 </div>
             </div>
