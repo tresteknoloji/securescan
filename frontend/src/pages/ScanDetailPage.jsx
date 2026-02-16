@@ -202,6 +202,12 @@ export default function ScanDetailPage() {
               </Button>
             </>
           )}
+          {scan.status === 'completed' && (
+            <Button variant="outline" onClick={handleRescan} data-testid="rescan-btn">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {t('rescan') || 'Tekrarla'}
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={fetchScan} data-testid="refresh-btn">
             <RefreshCw className="h-4 w-4" />
           </Button>
