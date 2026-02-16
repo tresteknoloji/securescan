@@ -53,9 +53,28 @@ def generate_html_report(
     targets: List[Dict[str, Any]],
     vulnerabilities: List[Dict[str, Any]],
     branding: Optional[Dict[str, Any]] = None,
-    lang: str = "en"
+    lang: str = "en",
+    theme: str = "dark"
 ) -> str:
-    """Generate HTML report"""
+    """Generate HTML report with dark/light theme support"""
+    
+    # Theme colors
+    if theme == "light":
+        bg_color = "#FFFFFF"
+        bg_secondary = "#F8FAFC"
+        text_color = "#1E293B"
+        text_muted = "#64748B"
+        border_color = "#E2E8F0"
+        card_bg = "#FFFFFF"
+        card_border = "#E2E8F0"
+    else:  # dark
+        bg_color = "#0F172A"
+        bg_secondary = "#1E293B"
+        text_color = "#F8FAFC"
+        text_muted = "#94A3B8"
+        border_color = "#334155"
+        card_bg = "#1E293B"
+        card_border = "#334155"
     
     # Default branding
     if not branding:
