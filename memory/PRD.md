@@ -157,15 +157,18 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 ### P0 (Kritik)
 - [x] Rapor indirme "Method Not Allowed" hatası - ✅ Düzeltildi
 - [x] CVE senkronizasyonu pagination - ✅ Düzeltildi
+- [x] Scan Iterations & On-Demand Reports - ✅ Düzeltildi (2026-02-16)
 - [ ] Sunucuya Nmap kurulumu
+- [ ] Reseller olarak müşteri hesabına giriş ("Login as Customer")
 
 ### P1 (Yüksek)
-- [ ] Reseller olarak müşteri hesabına giriş
-- [ ] Tarama sonrası e-posta bildirimi
+- [x] Tarama sonrası e-posta bildirimi - ✅ Tamamlandı
+- [ ] Docker Compose dosyası oluşturma (deployment kolaylığı)
 - [ ] Tarama zamanlaması (scheduled scans)
 - [ ] Bulk hedef import (CSV)
 
 ### P2 (Orta)
+- [ ] Hafif Linux agent (local network scanning)
 - [ ] 2FA (İki faktörlü doğrulama)
 - [ ] API rate limiting
 - [ ] Audit log
