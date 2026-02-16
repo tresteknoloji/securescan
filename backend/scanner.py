@@ -1,6 +1,6 @@
 """
 Vulnerability Scanner Engine
-Uses Nmap for port scanning and checks SSL/TLS
+Uses Nmap for port scanning, Detection Engine for fingerprinting and active checks
 """
 import asyncio
 import subprocess
@@ -14,11 +14,23 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# Import detection engine
+try:
+    from detection_engine import DetectionEngine, FingerprintEngine, ActiveChecker
+    DETECTION_ENGINE_AVAILABLE = True
+except ImportError:
+    DETECTION_ENGINE_AVAILABLE = False
+    logger.warning("Detection engine not available")
+
 class VulnerabilityScanner:
     """Main scanner class that orchestrates vulnerability scanning"""
     
-    def __init__(self, nvd_api_key: Optional[str] = None):
+    def __init__(self, nvd_api_key: Optional[str] = None, db=None):
         self.nvd_api_key = nvd_api_key
+        self.db = db
+        self.detection_engine = None
+        if DETECTION_ENGINE_AVAILABLE and db:
+            self.detection_engine = DetectionEngine(db, nvd_api_key)
         
     async def scan_target(self, target: str, target_type: str, config: dict) -> Dict[str, Any]:
         """
