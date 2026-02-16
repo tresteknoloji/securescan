@@ -80,7 +80,8 @@ def generate_html_report(
     vulnerabilities: List[Dict[str, Any]],
     branding: Optional[Dict[str, Any]] = None,
     lang: str = "en",
-    theme: str = "dark"
+    theme: str = "dark",
+    ports_data: Optional[List[Dict[str, Any]]] = None
 ) -> str:
     """Generate HTML report with dark/light theme support"""
     
