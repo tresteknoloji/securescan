@@ -30,6 +30,7 @@ from auth import (
 from scanner import VulnerabilityScanner, sync_cve_database
 from report_generator import generate_html_report, generate_pdf_report, save_report
 from email_service import send_email, get_scan_complete_email
+from risk_calculator import RiskCalculator, enrich_vulnerabilities_with_risk
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
