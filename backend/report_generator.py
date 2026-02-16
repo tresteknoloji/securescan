@@ -58,6 +58,22 @@ def get_first_http_reference(references: list) -> str:
     return ""
 
 
+def get_protocol_color(protocol: str) -> str:
+    """Get color for protocol/service type"""
+    colors = {
+        "http": "#10B981",
+        "https": "#059669",
+        "ssh": "#6366F1",
+        "ftp": "#F59E0B",
+        "smtp": "#EC4899",
+        "mysql": "#3B82F6",
+        "postgresql": "#8B5CF6",
+        "rdp": "#EF4444",
+        "telnet": "#F97316",
+    }
+    return colors.get(protocol.lower(), "#64748B")
+
+
 def generate_html_report(
     scan: Dict[str, Any],
     targets: List[Dict[str, Any]],
