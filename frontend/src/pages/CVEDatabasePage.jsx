@@ -340,7 +340,7 @@ export default function CVEDatabasePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />
-            Search CVE Database
+            {t('search_cve')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -348,7 +348,7 @@ export default function CVEDatabasePage() {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <Input
-                  placeholder="Search CVE ID or description (e.g., CVE-2024-1234, Apache, SQL injection)"
+                  placeholder={t('search_placeholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   data-testid="search-input"
@@ -356,32 +356,32 @@ export default function CVEDatabasePage() {
               </div>
               <Select value={severityFilter} onValueChange={setSeverityFilter}>
                 <SelectTrigger className="w-[150px]" data-testid="severity-filter">
-                  <SelectValue placeholder="Severity" />
+                  <SelectValue placeholder={t('severity_filter')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Severities</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="info">Info</SelectItem>
+                  <SelectItem value="all">{t('all_severities')}</SelectItem>
+                  <SelectItem value="critical">{t('critical')}</SelectItem>
+                  <SelectItem value="high">{t('high')}</SelectItem>
+                  <SelectItem value="medium">{t('medium')}</SelectItem>
+                  <SelectItem value="low">{t('low')}</SelectItem>
+                  <SelectItem value="info">{t('info')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={kevFilter} onValueChange={setKevFilter}>
                 <SelectTrigger className="w-[150px]" data-testid="kev-filter">
-                  <SelectValue placeholder="KEV Status" />
+                  <SelectValue placeholder={t('kev_filter')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All CVEs</SelectItem>
-                  <SelectItem value="kev">KEV Only</SelectItem>
+                  <SelectItem value="all">{t('all_severities')}</SelectItem>
+                  <SelectItem value="kev">{t('kev_only')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={yearFilter} onValueChange={setYearFilter}>
                 <SelectTrigger className="w-[120px]" data-testid="year-filter">
-                  <SelectValue placeholder="Year" />
+                  <SelectValue placeholder={t('year_filter')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Years</SelectItem>
+                  <SelectItem value="all">{t('all_years')}</SelectItem>
                   {years.map(year => (
                     <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                   ))}
@@ -389,7 +389,7 @@ export default function CVEDatabasePage() {
               </Select>
               <Button type="submit" disabled={searching} data-testid="search-btn">
                 {searching ? <Loader2 className="h-4 w-4 spinner" /> : <Search className="h-4 w-4" />}
-                <span className="ml-2">Search</span>
+                <span className="ml-2">{t('search')}</span>
               </Button>
             </div>
           </form>
@@ -398,7 +398,7 @@ export default function CVEDatabasePage() {
           <div className="mt-6">
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-muted-foreground">
-                {pagination.total.toLocaleString()} results found
+                {pagination.total.toLocaleString()} {t('cve_results')}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -407,7 +407,7 @@ export default function CVEDatabasePage() {
                   disabled={pagination.skip === 0}
                   onClick={() => handlePageChange(Math.max(0, pagination.skip - pagination.limit))}
                 >
-                  Previous
+                  {t('previous') || 'Önceki'}
                 </Button>
                 <Button
                   variant="outline"
@@ -415,7 +415,7 @@ export default function CVEDatabasePage() {
                   disabled={pagination.skip + pagination.limit >= pagination.total}
                   onClick={() => handlePageChange(pagination.skip + pagination.limit)}
                 >
-                  Next
+                  {t('next') || 'Sonraki'}
                 </Button>
               </div>
             </div>
@@ -425,9 +425,9 @@ export default function CVEDatabasePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[150px]">CVE ID</TableHead>
-                    <TableHead className="w-[100px]">Severity</TableHead>
+                    <TableHead className="w-[100px]">{t('severity')}</TableHead>
                     <TableHead className="w-[80px]">CVSS</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>{t('description')}</TableHead>
                     <TableHead className="w-[100px]">Published</TableHead>
                   </TableRow>
                 </TableHeader>
