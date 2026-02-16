@@ -183,10 +183,10 @@ export default function CVEDatabasePage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Database className="h-8 w-8 text-primary" />
-            CVE Database
+            {t('cve_database_title')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            National Vulnerability Database + CISA KEV
+            {t('cve_database_subtitle')}
           </p>
         </div>
         {isAdmin && (
@@ -198,7 +198,7 @@ export default function CVEDatabasePage() {
               data-testid="sync-kev-btn"
             >
               <Flame className="mr-2 h-4 w-4 text-orange-500" />
-              Sync KEV
+              {t('sync_kev')}
             </Button>
             <Button
               variant="outline"
@@ -207,7 +207,7 @@ export default function CVEDatabasePage() {
               data-testid="sync-incremental-btn"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              Incremental
+              {t('incremental_sync')}
             </Button>
             <Button
               onClick={handleFullSync}
@@ -215,7 +215,7 @@ export default function CVEDatabasePage() {
               data-testid="sync-full-btn"
             >
               <Download className="mr-2 h-4 w-4" />
-              Full Sync (240K+)
+              {t('full_sync')}
             </Button>
           </div>
         )}
