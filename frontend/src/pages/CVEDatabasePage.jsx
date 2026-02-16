@@ -248,7 +248,7 @@ export default function CVEDatabasePage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Database className="h-4 w-4" />
-              Total CVEs
+              {t('total_cves')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -262,20 +262,20 @@ export default function CVEDatabasePage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Flame className="h-4 w-4 text-orange-500" />
-              CISA KEV
+              {t('cisa_kev')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mono text-orange-500">
               {stats?.kev_count?.toLocaleString() || '0'}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Active Exploits</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('active_exploits')}</p>
           </CardContent>
         </Card>
         
         <Card className="border-red-500/30" data-testid="stat-critical">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Critical</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('critical')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mono text-red-500">
@@ -286,7 +286,7 @@ export default function CVEDatabasePage() {
         
         <Card className="border-orange-500/30" data-testid="stat-high">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">High</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('high')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mono text-orange-400">
@@ -297,7 +297,7 @@ export default function CVEDatabasePage() {
         
         <Card className="border-yellow-500/30" data-testid="stat-medium">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Medium</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('medium')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mono text-yellow-500">
@@ -313,7 +313,7 @@ export default function CVEDatabasePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              CVE Distribution by Year
+              {t('cve_by_year')}
             </CardTitle>
           </CardHeader>
           <CardContent>
