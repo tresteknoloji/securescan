@@ -637,10 +637,15 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
             logger.error(f"Failed to send scan complete email: {email_error}")
         
     except Exception as e:
-        logger.error(f"Scan {scan_id} failed: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Scan {scan_id} failed: {error_msg}")
         await thread_db.scans.update_one(
             {"id": scan_id},
-            {"$set": {"status": "failed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {
+                "status": "failed", 
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "error_message": error_msg
+            }}
         )
     finally:
         thread_client.close()
