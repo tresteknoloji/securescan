@@ -811,19 +811,23 @@ async def get_vulnerabilities(scan_id: str, current_user: dict = Depends(get_cur
 async def generate_report_get(
     scan_id: str,
     format: str = Query("pdf", enum=["pdf", "html"]),
+    iteration: Optional[int] = Query(None, description="Specific iteration number, or latest if not provided"),
+    theme: str = Query("dark", enum=["dark", "light"]),
     token: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Generate report for a scan (GET method)"""
-    return await _generate_report(scan_id, format, current_user)
+    """Generate report for a scan (GET method) - on-demand generation"""
+    return await _generate_report(scan_id, format, iteration, theme, current_user)
 
 @api_router.get("/scans/{scan_id}/report/download")
 async def download_report_direct(
     scan_id: str,
     format: str = Query("pdf", enum=["pdf", "html"]),
+    iteration: Optional[int] = Query(None),
+    theme: str = Query("dark", enum=["dark", "light"]),
     token: str = Query(...)
 ):
-    """Download report with token in query param (for window.open)"""
+    """Download report with token in query param (for window.open) - on-demand generation"""
     from auth import decode_token
     
     try:
@@ -831,26 +835,36 @@ async def download_report_direct(
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
-    return await _generate_report(scan_id, format, current_user)
+    return await _generate_report(scan_id, format, iteration, theme, current_user)
 
 @api_router.post("/scans/{scan_id}/report")
 async def generate_report_post(
     scan_id: str,
     format: str = Query("pdf", enum=["pdf", "html"]),
+    iteration: Optional[int] = Query(None),
+    theme: str = Query("dark", enum=["dark", "light"]),
     current_user: dict = Depends(get_current_user)
 ):
-    """Generate report for a scan (POST method)"""
-    return await _generate_report(scan_id, format, current_user)
+    """Generate report for a scan (POST method) - on-demand generation"""
+    return await _generate_report(scan_id, format, iteration, theme, current_user)
 
-async def _generate_report(scan_id: str, format: str, current_user: dict):
-    """Generate report for a scan"""
+async def _generate_report(scan_id: str, format: str, iteration: Optional[int], theme: str, current_user: dict):
+    """Generate report on-demand for a specific scan iteration"""
     scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    # Get targets and vulnerabilities
+    # Determine which iteration to use
+    target_iteration = iteration if iteration is not None else scan.get("current_iteration", 1)
+    
+    # Get targets
     targets = await db.targets.find({"id": {"$in": scan.get("target_ids", [])}}, {"_id": 0}).to_list(100)
-    vulns = await db.vulnerabilities.find({"scan_id": scan_id}, {"_id": 0}).to_list(10000)
+    
+    # Get vulnerabilities for specific iteration
+    vulns = await db.vulnerabilities.find(
+        {"scan_id": scan_id, "iteration": target_iteration},
+        {"_id": 0}
+    ).to_list(10000)
     
     # Get branding
     user = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
@@ -859,16 +873,23 @@ async def _generate_report(scan_id: str, format: str, current_user: dict):
     
     lang = user.get('language', 'en')
     
+    # Add iteration info to scan for report
+    scan_for_report = dict(scan)
+    scan_for_report['report_iteration'] = target_iteration
+    
     if format == "html":
-        html = generate_html_report(scan, targets, vulns, branding, lang)
+        html = generate_html_report(scan_for_report, targets, vulns, branding, lang, theme)
         return HTMLResponse(content=html)
     else:
-        pdf_bytes = await generate_pdf_report(scan, targets, vulns, branding, lang)
-        filepath = await save_report(scan_id, pdf_bytes, "pdf")
-        return FileResponse(
-            filepath,
+        pdf_bytes = await generate_pdf_report(scan_for_report, targets, vulns, branding, lang, theme)
+        # Return directly without saving to disk (on-demand generation)
+        from fastapi.responses import Response
+        return Response(
+            content=pdf_bytes,
             media_type="application/pdf",
-            filename=f"report_{scan.get('name', scan_id)}.pdf"
+            headers={
+                "Content-Disposition": f'attachment; filename="report_{scan.get("name", scan_id)}_iter{target_iteration}.pdf"'
+            }
         )
 
 # ============== Dashboard Stats ==============
