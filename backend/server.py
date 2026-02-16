@@ -434,6 +434,82 @@ def run_scan_sync(scan_id: str, targets: List[dict], config: dict):
     finally:
         loop.close()
 
+async def send_scan_complete_email(thread_db, scan_id: str, severity_counts: dict, total_vulns: int):
+    """
+    Send email notification when scan completes.
+    Uses the correct SMTP config based on user hierarchy:
+    - Customer -> Reseller's SMTP
+    - Admin's customer -> Admin's SMTP
+    - Admin scan -> Admin's SMTP
+    """
+    try:
+        # Get scan and user info
+        scan = await thread_db.scans.find_one({"id": scan_id}, {"_id": 0})
+        if not scan:
+            return
+        
+        user = await thread_db.users.find_one({"id": scan.get("owner_id")}, {"_id": 0})
+        if not user:
+            return
+        
+        # Determine which SMTP config to use
+        smtp_config = None
+        
+        if user.get("role") == "admin":
+            # Admin scan - use admin's SMTP
+            smtp_config = await thread_db.smtp_configs.find_one({"reseller_id": "admin", "is_active": True}, {"_id": 0})
+        elif user.get("role") == "customer":
+            # Customer - find parent (reseller or admin)
+            parent_id = user.get("parent_id")
+            if parent_id:
+                # Check if parent is reseller with SMTP config
+                smtp_config = await thread_db.smtp_configs.find_one({"reseller_id": parent_id, "is_active": True}, {"_id": 0})
+            
+            # Fallback to admin SMTP if no reseller SMTP
+            if not smtp_config:
+                smtp_config = await thread_db.smtp_configs.find_one({"reseller_id": "admin", "is_active": True}, {"_id": 0})
+        elif user.get("role") == "reseller":
+            # Reseller scan - use reseller's own SMTP
+            smtp_config = await thread_db.smtp_configs.find_one({"reseller_id": user.get("id"), "is_active": True}, {"_id": 0})
+            
+            # Fallback to admin SMTP
+            if not smtp_config:
+                smtp_config = await thread_db.smtp_configs.find_one({"reseller_id": "admin", "is_active": True}, {"_id": 0})
+        
+        if not smtp_config:
+            logger.warning(f"No SMTP config found for user {user.get('email')}, skipping email notification")
+            return
+        
+        # Generate email content
+        report_link = f"{os.environ.get('FRONTEND_URL', '')}/scans/{scan_id}"
+        email_html = get_scan_complete_email(
+            scan_name=scan.get("name", "Scan"),
+            total_vulns=total_vulns,
+            critical=severity_counts.get("critical", 0),
+            high=severity_counts.get("high", 0),
+            medium=severity_counts.get("medium", 0),
+            low=severity_counts.get("low", 0),
+            info=severity_counts.get("info", 0),
+            report_link=report_link,
+            lang=user.get("language", "en")
+        )
+        
+        # Send email
+        success = await send_email(
+            smtp_config=smtp_config,
+            to_email=user.get("email"),
+            subject=f"Scan Complete: {scan.get('name')}",
+            body_html=email_html
+        )
+        
+        if success:
+            logger.info(f"Scan complete email sent to {user.get('email')}")
+        else:
+            logger.error(f"Failed to send scan complete email to {user.get('email')}")
+            
+    except Exception as e:
+        logger.error(f"Error sending scan complete email: {str(e)}")
+
 async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
     """Actual scan logic running in separate thread"""
     # Create new MongoDB connection for this thread
