@@ -25,6 +25,17 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 
 ## Düzeltmeler ve Geliştirmeler (2026-02-16)
 
+### Real Risk Score - ✅ TAMAMLANDI
+- ✅ **Risk Calculator Modülü**: CVSS + KEV + Verification + Exposure faktörleri
+- ✅ **Formül**: `Real Risk = min(10, CVSS × Exposure_Mult + Bonuses)`
+  - KEV Bonus: +1.5
+  - Verified Bonus: +1.0
+  - Public Exploit: +0.5
+  - Exposure Multipliers: Internet(1.3), DMZ(1.1), Internal(1.0), Isolated(0.8)
+- ✅ **Priority System**: P1-P5 önceliklendirme
+- ✅ **Scan Config**: Exposure Level ve Data Sensitivity seçimi
+- ✅ **UI Gösterimi**: Real Risk Score, Priority badge'leri
+
 ### Email Bildirimleri - ✅ TAMAMLANDI
 - ✅ **Tarama Tamamlandığında Email**: Scan bitince owner'a otomatik mail
 - ✅ **Hiyerarşik SMTP Seçimi**:
