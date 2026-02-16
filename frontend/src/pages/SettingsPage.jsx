@@ -401,49 +401,6 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* CVE Database Tab */}
-        <TabsContent value="cve">
-          <Card data-testid="cve-card">
-            <CardHeader>
-              <CardTitle>CVE Database</CardTitle>
-              <CardDescription>
-                Manage vulnerability database from NVD
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 bg-secondary/30 rounded-sm">
-                  <p className="text-sm text-muted-foreground mb-1">Total CVEs</p>
-                  <p className="text-2xl font-bold mono">{cveStatus?.total_cves || 0}</p>
-                </div>
-                
-                <div className="p-4 bg-secondary/30 rounded-sm">
-                  <p className="text-sm text-muted-foreground mb-1">Last Sync</p>
-                  <p className="text-lg font-medium mono">
-                    {cveStatus?.last_sync
-                      ? new Date(cveStatus.last_sync).toLocaleString()
-                      : 'Never'}
-                  </p>
-                </div>
-              </div>
-              
-              <Button onClick={syncCve} disabled={syncing} data-testid="sync-cve-btn">
-                {syncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 spinner" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                Sync CVE Database
-              </Button>
-              
-              <p className="text-sm text-muted-foreground">
-                CVE data is synced from the National Vulnerability Database (NVD). 
-                Syncing fetches CVEs from the last 30 days.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
