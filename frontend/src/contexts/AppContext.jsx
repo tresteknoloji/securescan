@@ -222,6 +222,7 @@ const defaultTranslations = {
     port: "Port",
     service: "Servis",
     solution: "Çözüm",
+    rescan: "Tekrarla",
     cve: "CVE",
     references: "Referanslar",
     cve_database: "CVE Veritabanı",
