@@ -872,11 +872,18 @@ async def _generate_report(scan_id: str, format: str, iteration: Optional[int], 
     # Get targets
     targets = await db.targets.find({"id": {"$in": scan.get("target_ids", [])}}, {"_id": 0}).to_list(100)
     
-    # Get vulnerabilities for specific iteration
+    # Get vulnerabilities - try with iteration first, fallback to all if none found
     vulns = await db.vulnerabilities.find(
         {"scan_id": scan_id, "iteration": target_iteration},
         {"_id": 0}
     ).to_list(10000)
+    
+    # Fallback: if no vulns found with iteration filter, get all vulns for scan
+    if not vulns:
+        vulns = await db.vulnerabilities.find(
+            {"scan_id": scan_id},
+            {"_id": 0}
+        ).to_list(10000)
     
     # Get branding
     user = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
