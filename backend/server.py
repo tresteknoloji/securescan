@@ -791,25 +791,140 @@ async def save_branding(data: BrandingSettingsCreate, current_user: dict = Depen
     
     return BrandingSettingsResponse(**branding.model_dump())
 
-# ============== CVE Sync ==============
+# ============== CVE Database Management ==============
+from cve_manager import CVEManager, get_cve_manager
+
+@api_router.get("/cve/stats")
+async def get_cve_stats(current_user: dict = Depends(get_current_user)):
+    """Get detailed CVE database statistics"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    return await cve_mgr.get_database_stats()
+
+@api_router.get("/cve/sync-status")
+async def get_cve_sync_status(current_user: dict = Depends(get_current_user)):
+    """Get current sync status"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    return cve_mgr.sync_status
+
+@api_router.post("/cve/sync/full")
+async def trigger_full_cve_sync(
+    current_user: dict = Depends(require_role(["admin"]))
+):
+    """Trigger full CVE database sync from NVD (240K+ CVEs)"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    
+    if cve_mgr.sync_status["is_running"]:
+        raise HTTPException(status_code=400, detail="Sync already in progress")
+    
+    # Run in background
+    asyncio.create_task(cve_mgr.full_nvd_sync())
+    
+    return {"message": "Full CVE sync started. This may take several hours."}
+
+@api_router.post("/cve/sync/incremental")
+async def trigger_incremental_sync(
+    days_back: int = Query(7, ge=1, le=90),
+    current_user: dict = Depends(require_role(["admin"]))
+):
+    """Trigger incremental CVE sync (recent changes only)"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    
+    if cve_mgr.sync_status["is_running"]:
+        raise HTTPException(status_code=400, detail="Sync already in progress")
+    
+    asyncio.create_task(cve_mgr.incremental_sync(days_back))
+    
+    return {"message": f"Incremental CVE sync started for last {days_back} days."}
+
+@api_router.post("/cve/sync/kev")
+async def trigger_kev_sync(
+    current_user: dict = Depends(require_role(["admin"]))
+):
+    """Sync CISA Known Exploited Vulnerabilities catalog"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    result = await cve_mgr.sync_cisa_kev()
+    return result
+
+@api_router.get("/cve/search")
+async def search_cves(
+    q: Optional[str] = Query(None, description="Search query (CVE ID or description)"),
+    severity: Optional[str] = Query(None, enum=["critical", "high", "medium", "low", "info"]),
+    is_kev: Optional[bool] = Query(None, description="Filter by CISA KEV status"),
+    year: Optional[int] = Query(None, ge=1999, le=2030),
+    min_cvss: Optional[float] = Query(None, ge=0, le=10),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(get_current_user)
+):
+    """Search and filter CVE database"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    return await cve_mgr.search_cves(
+        query=q,
+        severity=severity,
+        is_kev=is_kev,
+        year=year,
+        min_cvss=min_cvss,
+        skip=skip,
+        limit=limit
+    )
+
+@api_router.get("/cve/{cve_id}")
+async def get_cve_detail(
+    cve_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get detailed CVE information"""
+    cve = await db.cves.find_one({"cve_id": cve_id.upper()}, {"_id": 0})
+    
+    if not cve:
+        raise HTTPException(status_code=404, detail="CVE not found")
+    
+    # Get KEV details if applicable
+    if cve.get("is_kev"):
+        cve_mgr = get_cve_manager(db, NVD_API_KEY)
+        kev_details = await cve_mgr.get_kev_details(cve_id.upper())
+        cve["kev_details"] = kev_details
+    
+    return cve
+
+@api_router.get("/kev/list")
+async def get_kev_list(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get list of Known Exploited Vulnerabilities"""
+    total = await db.kev_catalog.count_documents({})
+    results = await db.kev_catalog.find({}, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "results": results
+    }
+
+# Legacy endpoint - keeping for backward compatibility
 @api_router.post("/cve/sync")
-async def trigger_cve_sync(
+async def trigger_cve_sync_legacy(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_role(["admin"]))
 ):
-    """Trigger CVE database sync from NVD"""
-    background_tasks.add_task(sync_cve_database, db, NVD_API_KEY, 30)
+    """Legacy: Trigger incremental CVE sync"""
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    asyncio.create_task(cve_mgr.incremental_sync(30))
     return {"message": "CVE sync started"}
 
 @api_router.get("/cve/status")
 async def get_cve_status(current_user: dict = Depends(get_current_user)):
     """Get CVE database status"""
-    total = await db.cves.count_documents({})
-    latest = await db.cves.find_one({}, {"_id": 0}, sort=[("synced_at", -1)])
-    
+    cve_mgr = get_cve_manager(db, NVD_API_KEY)
+    stats = await cve_mgr.get_database_stats()
     return {
-        "total_cves": total,
-        "last_sync": latest.get("synced_at") if latest else None
+        "total_cves": stats["total_cves"],
+        "kev_count": stats["kev_count"],
+        "last_sync": stats["last_sync"]["completed_at"] if stats["last_sync"] else None,
+        "is_syncing": stats["is_syncing"]
     }
 
 # ============== Translations ==============
