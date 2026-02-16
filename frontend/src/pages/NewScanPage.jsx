@@ -51,6 +51,9 @@ export default function NewScanPage() {
     check_ssl: true,
     check_cve: true,
     pci_compliance: true,
+    active_checks: true,
+    exposure_level: 'internet',
+    data_sensitivity: 'normal',
   });
 
   useEffect(() => {
