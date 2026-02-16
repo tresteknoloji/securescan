@@ -35,12 +35,15 @@ class VulnerabilityScanner:
     async def scan_target(self, target: str, target_type: str, config: dict) -> Dict[str, Any]:
         """
         Scan a single target and return results
+        Enhanced with detection engine for fingerprinting and active checks
         """
         results = {
             "target": target,
             "target_type": target_type,
             "vulnerabilities": [],
             "ports": [],
+            "fingerprints": [],
+            "active_checks": [],
             "ssl_info": None,
             "scan_time": datetime.now(timezone.utc).isoformat()
         }
@@ -69,16 +72,47 @@ class VulnerabilityScanner:
             results["ports"] = port_results.get("ports", [])
             results["vulnerabilities"].extend(port_results.get("vulnerabilities", []))
             
-            # SSL/TLS check
-            if config.get("check_ssl", True):
+            # Extract open port numbers
+            open_ports = [p["port"] for p in results["ports"] if p.get("state") == "open"]
+            
+            # Run detection engine if available
+            if self.detection_engine and open_ports:
+                logger.info(f"Running detection engine on {len(open_ports)} open ports")
+                
+                detection_results = await self.detection_engine.scan_target(
+                    ip_address if target_type != "domain" else target,
+                    open_ports,
+                    config
+                )
+                
+                # Add fingerprints
+                results["fingerprints"] = detection_results.get("fingerprints", [])
+                
+                # Add active check results
+                results["active_checks"] = detection_results.get("active_check_results", [])
+                
+                # Merge vulnerabilities (avoid duplicates)
+                existing_cves = {v.get("cve_id") for v in results["vulnerabilities"] if v.get("cve_id")}
+                for vuln in detection_results.get("vulnerabilities", []):
+                    if vuln.get("cve_id") not in existing_cves:
+                        results["vulnerabilities"].append(vuln)
+            
+            # SSL/TLS check (legacy, detection engine also does this)
+            if config.get("check_ssl", True) and not self.detection_engine:
                 ssl_results = await self._check_ssl(target if target_type == "domain" else ip_address)
                 results["ssl_info"] = ssl_results.get("info")
                 results["vulnerabilities"].extend(ssl_results.get("vulnerabilities", []))
             
-            # Check for common vulnerabilities based on services
-            if config.get("check_cve", True):
+            # Check for common vulnerabilities based on services (legacy)
+            if config.get("check_cve", True) and not self.detection_engine:
                 cve_vulns = await self._check_service_vulnerabilities(results["ports"])
                 results["vulnerabilities"].extend(cve_vulns)
+            
+            # Sort vulnerabilities by severity
+            severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+            results["vulnerabilities"].sort(
+                key=lambda x: severity_order.get(x.get("severity", "info"), 5)
+            )
                 
         except Exception as e:
             logger.error(f"Error scanning target {target}: {str(e)}")
