@@ -395,8 +395,12 @@ async def create_scan(
         {"$inc": {"scans_used_this_month": 1}}
     )
     
+    # Add iteration to config
+    config_dict = scan.config.model_dump()
+    config_dict["iteration"] = 1
+    
     # Start scan in a separate task (non-blocking)
-    asyncio.create_task(run_scan_wrapper(scan.id, targets, scan.config.model_dump()))
+    asyncio.create_task(run_scan_wrapper(scan.id, targets, config_dict))
     
     return ScanResponse(**scan.model_dump())
 
