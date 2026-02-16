@@ -796,8 +796,8 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
 @api_router.get("/settings/smtp", response_model=Optional[SMTPConfigResponse])
 async def get_smtp_config(current_user: dict = Depends(require_role(["admin", "reseller"]))):
     """Get SMTP configuration"""
-    reseller_id = current_user['sub']
-    config = await db.smtp_config.find_one({"reseller_id": reseller_id}, {"_id": 0, "password": 0})
+    reseller_id = "admin" if current_user.get("role") == "admin" else current_user['sub']
+    config = await db.smtp_configs.find_one({"reseller_id": reseller_id}, {"_id": 0, "password": 0})
     
     if not config:
         return None
@@ -807,7 +807,7 @@ async def get_smtp_config(current_user: dict = Depends(require_role(["admin", "r
 @api_router.post("/settings/smtp", response_model=SMTPConfigResponse)
 async def save_smtp_config(data: SMTPConfigCreate, current_user: dict = Depends(require_role(["admin", "reseller"]))):
     """Save SMTP configuration"""
-    reseller_id = current_user['sub']
+    reseller_id = "admin" if current_user.get("role") == "admin" else current_user['sub']
     
     config = SMTPConfig(
         reseller_id=reseller_id,
@@ -825,13 +825,50 @@ async def save_smtp_config(data: SMTPConfigCreate, current_user: dict = Depends(
     config_dict['created_at'] = config_dict['created_at'].isoformat()
     config_dict['updated_at'] = config_dict['updated_at'].isoformat()
     
-    await db.smtp_config.update_one(
+    await db.smtp_configs.update_one(
         {"reseller_id": reseller_id},
         {"$set": config_dict},
         upsert=True
     )
     
     return SMTPConfigResponse(**{k: v for k, v in config.model_dump().items() if k != "password"})
+
+@api_router.post("/settings/smtp/test")
+async def test_smtp_config(
+    test_email: str = Query(..., description="Email address to send test email"),
+    current_user: dict = Depends(require_role(["admin", "reseller"]))
+):
+    """Test SMTP configuration by sending a test email"""
+    reseller_id = "admin" if current_user.get("role") == "admin" else current_user['sub']
+    config = await db.smtp_configs.find_one({"reseller_id": reseller_id}, {"_id": 0})
+    
+    if not config:
+        raise HTTPException(status_code=404, detail="SMTP configuration not found")
+    
+    # Send test email
+    test_html = """
+    <html>
+    <body style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #3B82F6;">SMTP Test Email</h2>
+        <p>This is a test email from your SecureScan vulnerability scanner.</p>
+        <p>If you received this email, your SMTP configuration is working correctly.</p>
+        <hr>
+        <p style="color: #666; font-size: 12px;">This is an automated test message.</p>
+    </body>
+    </html>
+    """
+    
+    success = await send_email(
+        smtp_config=config,
+        to_email=test_email,
+        subject="SecureScan SMTP Test",
+        body_html=test_html
+    )
+    
+    if success:
+        return {"success": True, "message": f"Test email sent to {test_email}"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send test email. Check SMTP settings.")
 
 @api_router.get("/settings/branding", response_model=Optional[BrandingSettingsResponse])
 async def get_branding(current_user: dict = Depends(get_current_user)):
