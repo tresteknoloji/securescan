@@ -101,20 +101,6 @@ export default function SettingsPage() {
     }
   };
 
-  const syncCve = async () => {
-    setSyncing(true);
-    try {
-      await api.post('/cve/sync');
-      toast.success('CVE sync started');
-      // Refresh status after a delay
-      setTimeout(fetchCveStatus, 5000);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || t('error'));
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96" data-testid="settings-loading">
