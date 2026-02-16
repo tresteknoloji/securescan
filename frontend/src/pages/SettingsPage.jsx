@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Settings, Palette, Mail, Loader2, Save, Database, RefreshCw } from 'lucide-react';
+import { Palette, Mail, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
