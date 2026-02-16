@@ -28,7 +28,7 @@ from auth import (
     get_current_user, require_role
 )
 from scanner import VulnerabilityScanner, sync_cve_database
-from report_generator import generate_html_report, generate_pdf_report, save_report
+from report_generator import generate_html_report, generate_pdf_report
 from email_service import send_email, get_scan_complete_email
 from risk_calculator import RiskCalculator, enrich_vulnerabilities_with_risk
 
