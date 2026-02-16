@@ -345,6 +345,19 @@ export default function NewScanPage() {
 
                 <div className="flex items-center gap-3">
                   <Checkbox
+                    id="active_checks"
+                    checked={config.active_checks}
+                    onCheckedChange={(v) => setConfig({ ...config, active_checks: v })}
+                    data-testid="active-checks-checkbox"
+                  />
+                  <Label htmlFor="active_checks" className="flex items-center gap-2 cursor-pointer">
+                    <Radar className="h-4 w-4 text-muted-foreground" />
+                    Active Checks (SQLi, XSS, etc.)
+                  </Label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Checkbox
                     id="pci_compliance"
                     checked={config.pci_compliance}
                     onCheckedChange={(v) => setConfig({ ...config, pci_compliance: v })}
@@ -354,6 +367,46 @@ export default function NewScanPage() {
                     <Search className="h-4 w-4 text-muted-foreground" />
                     {t('pci_compliance')}
                   </Label>
+                </div>
+              </div>
+
+              {/* Risk Assessment Settings */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-sm font-medium">Risk Assessment</Label>
+                
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Exposure Level</Label>
+                  <Select
+                    value={config.exposure_level}
+                    onValueChange={(v) => setConfig({ ...config, exposure_level: v })}
+                  >
+                    <SelectTrigger data-testid="exposure-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="internet">Internet (Public)</SelectItem>
+                      <SelectItem value="dmz">DMZ</SelectItem>
+                      <SelectItem value="internal">Internal Network</SelectItem>
+                      <SelectItem value="isolated">Isolated/Air-gapped</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Data Sensitivity</Label>
+                  <Select
+                    value={config.data_sensitivity}
+                    onValueChange={(v) => setConfig({ ...config, data_sensitivity: v })}
+                  >
+                    <SelectTrigger data-testid="sensitivity-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="sensitive">Sensitive (PII, Financial)</SelectItem>
+                      <SelectItem value="critical">Critical (Healthcare, Gov)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
