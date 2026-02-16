@@ -441,7 +441,7 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
     thread_db = thread_client[os.environ['DB_NAME']]
     
     try:
-        scanner = VulnerabilityScanner(nvd_api_key=NVD_API_KEY)
+        scanner = VulnerabilityScanner(nvd_api_key=NVD_API_KEY, db=thread_db)
         total_targets = len(targets)
         
         severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
