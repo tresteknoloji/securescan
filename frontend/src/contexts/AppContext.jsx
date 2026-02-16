@@ -272,6 +272,9 @@ const defaultTranslations = {
     date_added: "Eklenme Tarihi",
     due_date: "Son Tarih",
     required_action: "Gerekli Aksiyon",
+    search: "Ara",
+    previous: "Önceki",
+    next: "Sonraki",
   },
   en: {
     dashboard: "Dashboard",
