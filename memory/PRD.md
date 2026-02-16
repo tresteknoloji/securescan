@@ -25,6 +25,29 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 
 ## Düzeltmeler ve Geliştirmeler (2026-02-16)
 
+### Scan Iterations & On-Demand Reports - ✅ TAMAMLANDI
+- ✅ **Tarama Yinelemeleri**: "Tekrarla" (Rescan) butonu yeni tarama yerine mevcut tarama altında yeni iterasyon oluşturur
+  - `current_iteration` alanı mevcut iterasyon numarasını tutar
+  - `iteration_history` dizisi önceki iterasyonların özetini saklar
+  - Aynı tarama ID'si korunur, zafiyet karşılaştırması kolaylaşır
+- ✅ **İsteğe Bağlı Rapor Üretimi**: Raporlar sunucuda saklanmaz, indirme tıklandığında üretilir
+  - `/api/scans/{id}/report?format=html&iteration=1&theme=dark` - yeni parametreler
+  - Disk alanı tasarrufu, her zaman güncel rapor
+- ✅ **Temalı Raporlar**: HTML/PDF raporlar için açık/koyu tema seçeneği
+  - `theme=light`: Beyaz arkaplan, koyu metin
+  - `theme=dark`: Koyu lacivert arkaplan, açık metin
+- ✅ **Iterasyon UI**: Tarama detay sayfasında iterasyon seçici dropdown
+  - Sadece `current_iteration > 1` olduğunda görünür
+  - Geçmiş iterasyonların tarih ve zafiyet sayısını gösterir
+- ✅ **Tema Seçici UI**: "Rapor Teması: Koyu | Açık" butonları
+  - Seçilen tema rapor indirmede kullanılır
+
+### API Endpoints Güncellemesi
+- `POST /api/scans/{id}/rescan` - Yeni iterasyon başlatır (aynı scan ID)
+- `GET /api/scans/{id}/history` - Iterasyon geçmişini getirir
+- `GET /api/scans/{id}/vulnerabilities/{iteration}` - Belirli iterasyonun zafiyetleri
+- `GET /api/scans/{id}/report?iteration=X&theme=light|dark` - Temalı rapor üretimi
+
 ### Real Risk Score - ✅ TAMAMLANDI
 - ✅ **Risk Calculator Modülü**: CVSS + KEV + Verification + Exposure faktörleri
 - ✅ **Formül**: `Real Risk = min(10, CVSS × Exposure_Mult + Bonuses)`
