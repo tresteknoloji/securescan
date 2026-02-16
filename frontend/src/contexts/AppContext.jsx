@@ -426,6 +426,9 @@ const defaultTranslations = {
     date_added: "Date Added",
     due_date: "Due Date",
     required_action: "Required Action",
+    search: "Search",
+    previous: "Previous",
+    next: "Next",
   }
 };
 
