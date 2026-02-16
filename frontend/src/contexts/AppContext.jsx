@@ -224,6 +224,7 @@ const defaultTranslations = {
     solution: "Çözüm",
     cve: "CVE",
     references: "Referanslar",
+    cve_database: "CVE Veritabanı",
     welcome_back: "Tekrar Hoş Geldiniz",
     sign_in_to_continue: "Devam etmek için giriş yapın",
     dont_have_account: "Hesabınız yok mu?",
