@@ -360,7 +360,6 @@ async def get_scan(scan_id: str, current_user: dict = Depends(get_current_user))
 @api_router.post("/scans", response_model=ScanResponse)
 async def create_scan(
     data: ScanCreate,
-    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Create and start a new scan"""
