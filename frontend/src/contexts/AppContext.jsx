@@ -335,6 +335,7 @@ const defaultTranslations = {
     port: "Port",
     service: "Service",
     solution: "Solution",
+    rescan: "Rescan",
     cve: "CVE",
     references: "References",
     cve_database: "CVE Database",
