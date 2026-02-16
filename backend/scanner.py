@@ -98,7 +98,7 @@ class VulnerabilityScanner:
                         results["vulnerabilities"].append(vuln)
             
             # SSL/TLS check (legacy, detection engine also does this)
-            if config.get("check_ssl", True) and not self.detection_engine:
+            if config.get("check_ssl", True) and self.detection_engine is None:
                 ssl_results = await self._check_ssl(target if target_type == "domain" else ip_address)
                 results["ssl_info"] = ssl_results.get("info")
                 results["vulnerabilities"].extend(ssl_results.get("vulnerabilities", []))
