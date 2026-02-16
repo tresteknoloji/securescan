@@ -76,7 +76,7 @@ class VulnerabilityScanner:
             open_ports = [p["port"] for p in results["ports"] if p.get("state") == "open"]
             
             # Run detection engine if available
-            if self.detection_engine and open_ports:
+            if self.detection_engine is not None and open_ports:
                 logger.info(f"Running detection engine on {len(open_ports)} open ports")
                 
                 detection_results = await self.detection_engine.scan_target(
