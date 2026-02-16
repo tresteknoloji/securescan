@@ -429,5 +429,8 @@ TRANSLATIONS = {
         "quick_scan": "Quick Scan",
         "full_scan": "Full Scan",
         "stealth_scan": "Stealth Scan",
+        "cve_database": "CVE Database",
+        "solution": "Solution",
+        "live_results": "Live Results",
     }
 }
