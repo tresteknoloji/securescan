@@ -601,6 +601,20 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
             
             # Update progress
             progress = int((idx + 1) / total_targets * 100)
+            
+            # Save discovered ports for this target
+            discovered_ports = results.get("ports", [])
+            if discovered_ports:
+                port_record = {
+                    "scan_id": scan_id,
+                    "iteration": iteration,
+                    "target_id": target.get("id"),
+                    "target_value": target.get("value"),
+                    "ports": discovered_ports,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await thread_db.scan_ports.insert_one(port_record)
+            
             await thread_db.scans.update_one(
                 {"id": scan_id},
                 {"$set": {"progress": progress}}
