@@ -20,6 +20,9 @@ import {
   Shield,
   Server,
   ExternalLink,
+  Fingerprint,
+  Zap,
+  Flame,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
