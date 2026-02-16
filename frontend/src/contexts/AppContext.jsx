@@ -336,6 +336,7 @@ const defaultTranslations = {
     solution: "Solution",
     cve: "CVE",
     references: "References",
+    cve_database: "CVE Database",
     welcome_back: "Welcome Back",
     sign_in_to_continue: "Sign in to continue",
     dont_have_account: "Don't have an account?",
