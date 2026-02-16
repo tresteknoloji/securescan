@@ -74,6 +74,69 @@ def get_protocol_color(protocol: str) -> str:
     return colors.get(protocol.lower(), "#64748B")
 
 
+def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]] = None) -> str:
+    """Generate HTML section for discovered ports"""
+    if not ports_data:
+        return f"<p style='color: {text_muted}; text-align: center; padding: 20px;'>{l.get('no_ports', 'No open ports discovered.')}</p>"
+    
+    primary_color = branding.get('primary_color', '#3B82F6') if branding else '#3B82F6'
+    
+    html_parts = []
+    
+    for port_record in ports_data:
+        target_value = port_record.get('target_value', 'Unknown')
+        ports = port_record.get('ports', [])
+        
+        if not ports:
+            continue
+        
+        html_parts.append(f'''
+        <div style="background: {card_bg}; border: 1px solid {card_border}; border-radius: 8px; margin-bottom: 16px; overflow: hidden;">
+            <div style="padding: 12px 16px; border-bottom: 1px solid {card_border}; font-weight: 600;">
+                <span style="font-family: 'JetBrains Mono', monospace; color: {primary_color};">{target_value}</span>
+                <span style="color: {text_muted}; font-size: 14px; margin-left: 10px;">({len(ports)} {l.get('open_ports', 'open ports').lower()})</span>
+            </div>
+            <div style="padding: 16px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid {card_border};">
+                            <th style="text-align: left; padding: 8px; color: {text_muted}; font-size: 12px; text-transform: uppercase;">{l.get('port', 'Port')}</th>
+                            <th style="text-align: left; padding: 8px; color: {text_muted}; font-size: 12px; text-transform: uppercase;">{l.get('state', 'State')}</th>
+                            <th style="text-align: left; padding: 8px; color: {text_muted}; font-size: 12px; text-transform: uppercase;">{l.get('service', 'Service')}</th>
+                            <th style="text-align: left; padding: 8px; color: {text_muted}; font-size: 12px; text-transform: uppercase;">Version</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        ''')
+        
+        for port in ports:
+            port_num = port.get('port', '')
+            state = port.get('state', 'open')
+            service = port.get('service', 'unknown')
+            version = port.get('version', '')
+            protocol = port.get('protocol', 'tcp')
+            service_color = get_protocol_color(service)
+            state_color = '#10B981' if state == 'open' else '#F59E0B'
+            
+            html_parts.append(f'''
+                        <tr style="border-bottom: 1px solid {card_border};">
+                            <td style="padding: 10px 8px; font-family: 'JetBrains Mono', monospace; font-weight: 600;">{port_num}/{protocol}</td>
+                            <td style="padding: 10px 8px;"><span style="color: {state_color}; font-weight: 500;">{state}</span></td>
+                            <td style="padding: 10px 8px;"><span style="color: {service_color}; font-weight: 500;">{service}</span></td>
+                            <td style="padding: 10px 8px; color: {text_muted}; font-size: 13px;">{version or '-'}</td>
+                        </tr>
+            ''')
+        
+        html_parts.append('''
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        ''')
+    
+    return ''.join(html_parts) if html_parts else f"<p style='color: {text_muted}; text-align: center; padding: 20px;'>{l.get('no_ports', 'No open ports discovered.')}</p>"
+
+
 def generate_html_report(
     scan: Dict[str, Any],
     targets: List[Dict[str, Any]],
