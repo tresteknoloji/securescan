@@ -644,6 +644,133 @@ async def cancel_scan(scan_id: str, current_user: dict = Depends(get_current_use
     
     return {"message": "Scan cancelled"}
 
+@api_router.post("/scans/{scan_id}/rescan")
+async def rescan(scan_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Rescan - creates a new iteration under the same scan.
+    Saves current results to history and starts a fresh scan.
+    """
+    scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    if current_user.get("role") != "admin" and scan.get("user_id") != current_user['sub']:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if scan.get("status") == "running":
+        raise HTTPException(status_code=400, detail="Scan is already running")
+    
+    # Get current iteration
+    current_iteration = scan.get("current_iteration", 1)
+    
+    # Save current results to history (if completed)
+    if scan.get("status") == "completed":
+        history_entry = {
+            "iteration": current_iteration,
+            "started_at": scan.get("started_at"),
+            "completed_at": scan.get("completed_at"),
+            "total_vulnerabilities": scan.get("total_vulnerabilities", 0),
+            "critical_count": scan.get("critical_count", 0),
+            "high_count": scan.get("high_count", 0),
+            "medium_count": scan.get("medium_count", 0),
+            "low_count": scan.get("low_count", 0),
+            "info_count": scan.get("info_count", 0),
+            "highest_risk_score": scan.get("highest_risk_score", 0),
+            "overall_risk_level": scan.get("overall_risk_level", "info"),
+        }
+        
+        # Get existing history
+        history = scan.get("iteration_history", [])
+        history.append(history_entry)
+        
+        # Update scan for new iteration
+        new_iteration = current_iteration + 1
+        
+        await db.scans.update_one(
+            {"id": scan_id},
+            {"$set": {
+                "current_iteration": new_iteration,
+                "iteration_history": history,
+                "status": "pending",
+                "progress": 0,
+                "started_at": None,
+                "completed_at": None,
+                "total_vulnerabilities": 0,
+                "critical_count": 0,
+                "high_count": 0,
+                "medium_count": 0,
+                "low_count": 0,
+                "info_count": 0,
+                "highest_risk_score": 0,
+                "average_risk_score": 0,
+                "overall_risk_level": "info",
+                "kev_count": 0,
+                "verified_count": 0,
+                "priority_1_count": 0,
+            }}
+        )
+    else:
+        new_iteration = current_iteration
+        await db.scans.update_one(
+            {"id": scan_id},
+            {"$set": {"status": "pending", "progress": 0}}
+        )
+    
+    # Get targets for this scan
+    target_ids = scan.get("target_ids", [])
+    targets = await db.targets.find({"id": {"$in": target_ids}}, {"_id": 0}).to_list(100)
+    targets = [{"id": t["id"], "value": t["value"], "target_type": t["target_type"]} for t in targets]
+    
+    if not targets:
+        raise HTTPException(status_code=400, detail="No valid targets found")
+    
+    # Get config with new iteration
+    config = scan.get("config", {})
+    if isinstance(config, dict):
+        config_dict = config
+    else:
+        config_dict = config.model_dump() if hasattr(config, 'model_dump') else dict(config)
+    
+    # Add iteration to config for tracking
+    config_dict["iteration"] = new_iteration
+    
+    # Start scan in background
+    asyncio.create_task(run_scan_wrapper(scan_id, targets, config_dict))
+    
+    # Return updated scan
+    updated_scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
+    return ScanResponse(**updated_scan)
+
+@api_router.get("/scans/{scan_id}/history")
+async def get_scan_history(scan_id: str, current_user: dict = Depends(get_current_user)):
+    """Get scan iteration history"""
+    scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    return {
+        "current_iteration": scan.get("current_iteration", 1),
+        "history": scan.get("iteration_history", [])
+    }
+
+@api_router.get("/scans/{scan_id}/vulnerabilities/{iteration}")
+async def get_vulnerabilities_by_iteration(
+    scan_id: str,
+    iteration: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get vulnerabilities for a specific iteration"""
+    vulns = await db.vulnerabilities.find(
+        {"scan_id": scan_id, "iteration": iteration},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    for v in vulns:
+        if 'created_at' in v and hasattr(v['created_at'], 'isoformat'):
+            v['created_at'] = v['created_at'].isoformat()
+    
+    return vulns
+
 @api_router.delete("/scans/{scan_id}")
 async def delete_scan(scan_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a scan and its vulnerabilities"""
