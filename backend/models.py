@@ -180,6 +180,7 @@ class Vulnerability(BaseModel):
     
     id: str = Field(default_factory=generate_uuid)
     scan_id: str
+    iteration: int = 1  # Which iteration this belongs to
     target_id: str
     target_value: str
     severity: SeverityType
@@ -198,6 +199,7 @@ class Vulnerability(BaseModel):
 class VulnerabilityResponse(BaseModel):
     id: str
     scan_id: str
+    iteration: int = 1
     target_id: str
     target_value: str
     severity: SeverityType
