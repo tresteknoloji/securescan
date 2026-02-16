@@ -25,6 +25,29 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 
 ## Düzeltmeler ve Geliştirmeler (2026-02-16)
 
+### Faz 2: Detection Engine - ✅ TAMAMLANDI
+- ✅ **Fingerprint Engine**: HTTP/HTTPS servis tespiti
+  - Server header parsing (Apache, Nginx, IIS, Tomcat, etc.)
+  - X-Powered-By teknoloji tespiti (PHP, ASP.NET, Express, etc.)
+  - HTML içerik analizi (WordPress, Drupal, React, Vue, Angular, jQuery)
+  - Favicon hash matching
+  - SSL sertifika bilgi çıkarma
+- ✅ **CPE Normalizasyonu**: Tespit → CPE → CVE eşleştirme
+  - Servis/versiyon → CPE 2.3 string dönüşümü
+  - CPE-CVE veritabanı sorgusu
+  - Version range matching
+- ✅ **Active Checks**: 10 güvenlik testi
+  - Path Traversal (CWE-22)
+  - SQL Injection (CWE-89)
+  - XSS - Cross-Site Scripting (CWE-79)
+  - SSRF (CWE-918)
+  - Open Redirect (CWE-601)
+  - Sensitive File Exposure (.git, .env, backup.sql)
+  - Admin Panel Detection
+  - SSL/TLS Vulnerabilities
+  - CORS Misconfiguration (CWE-942)
+  - Missing Security Headers (CWE-693)
+
 ### Faz 1: CVE Altyapısı - ✅ TAMAMLANDI
 - ✅ **Tam CVE Senkronizasyonu**: NVD API ile pagination destekli tam veritabanı sync
 - ✅ **CISA KEV Entegrasyonu**: Aktif exploit edilen zafiyetler (1518 KEV)
