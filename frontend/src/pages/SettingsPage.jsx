@@ -153,10 +153,6 @@ export default function SettingsPage() {
             <Mail className="h-4 w-4" />
             {t('smtp_settings')}
           </TabsTrigger>
-          <TabsTrigger value="cve" className="gap-2">
-            <Database className="h-4 w-4" />
-            CVE Database
-          </TabsTrigger>
         </TabsList>
 
         {/* Branding Tab */}
