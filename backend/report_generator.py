@@ -162,7 +162,12 @@ def generate_html_report(
             "non_compliant": "NON-COMPLIANT",
             "pci_note": "PCI DSS compliance requires no Critical or High severity vulnerabilities.",
             "iteration": "Iteration",
-            "of": "of"
+            "of": "of",
+            "discovered_ports": "Discovered Ports & Services",
+            "open_ports": "Open Ports",
+            "no_ports": "No open ports discovered.",
+            "state": "State",
+            "protocol": "Protocol"
         },
         "tr": {
             "title": "Zafiyet Tarama Raporu",
@@ -186,7 +191,12 @@ def generate_html_report(
             "non_compliant": "UYUMSUZ",
             "pci_note": "PCI DSS uyumluluğu için Kritik veya Yüksek seviye zafiyet bulunmamalıdır.",
             "iteration": "Yineleme",
-            "of": "/"
+            "of": "/",
+            "discovered_ports": "Tespit Edilen Portlar ve Servisler",
+            "open_ports": "Açık Portlar",
+            "no_ports": "Açık port tespit edilmedi.",
+            "state": "Durum",
+            "protocol": "Protokol"
         }
     }
     
