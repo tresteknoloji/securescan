@@ -29,7 +29,7 @@ class VulnerabilityScanner:
         self.nvd_api_key = nvd_api_key
         self.db = db
         self.detection_engine = None
-        if DETECTION_ENGINE_AVAILABLE and db:
+        if DETECTION_ENGINE_AVAILABLE and db is not None:
             self.detection_engine = DetectionEngine(db, nvd_api_key)
         
     async def scan_target(self, target: str, target_type: str, config: dict) -> Dict[str, Any]:
