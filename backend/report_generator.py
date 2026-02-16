@@ -48,6 +48,16 @@ def get_severity_label(severity: str, lang: str = "en") -> str:
     return labels.get(lang, labels["en"]).get(severity.lower(), severity.upper())
 
 
+def get_first_http_reference(references: list) -> str:
+    """Get first http/https reference URL from list, skip ftp and other protocols"""
+    if not references:
+        return ""
+    for ref in references:
+        if isinstance(ref, str) and (ref.startswith("http://") or ref.startswith("https://")):
+            return ref
+    return ""
+
+
 def generate_html_report(
     scan: Dict[str, Any],
     targets: List[Dict[str, Any]],
