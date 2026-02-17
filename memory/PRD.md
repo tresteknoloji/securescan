@@ -146,6 +146,25 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - ✅ Servis bazlı zafiyet kontrolü
 - ✅ CVE eşleştirme
 
+### Düzeltmeler (2026-02-17) - ✅ TAMAMLANDI
+
+#### CVE Referansları Raporda Görünmeme Hatası
+- ✅ **Problem**: CVE referansları veritabanında `{url, source, tags}` obje formatında saklanıyordu ancak kod string formatı bekliyordu
+- ✅ **Çözüm**: `server.py` ve `report_generator.py` dosyalarındaki referans işleme kodları her iki formatı da destekleyecek şekilde güncellendi
+- ✅ **Dosyalar**: `backend/server.py` (satır 550-560), `backend/report_generator.py` (satır 51-59)
+
+#### Başarısız Tarama Nedeni Görüntüleme
+- ✅ **Problem**: Tarama başarısız olduğunda neden gösterilmiyordu
+- ✅ **Çözüm**: 
+  - `Scan` modeline `failure_reason` alanı eklendi
+  - Backend tarama başarısız olduğunda hata mesajını kaydediyor
+  - Frontend'de kırmızı uyarı kartı olarak görüntüleniyor
+- ✅ **Dosyalar**: `backend/models.py` (satır 139, 177), `backend/server.py` (satır 666), `frontend/src/pages/ScanDetailPage.jsx` (satır 293-315)
+
+#### PDF Rapor Altyapı Sorunu
+- ✅ **Problem**: WeasyPrint `libpangoft2-1.0-0` sistem bağımlılığı eksikti
+- ✅ **Çözüm**: `apt install libpangoft2-1.0-0` ile bağımlılık kuruldu
+
 ## Düzeltmeler (2026-02-15)
 
 ### Tamamlanan Düzeltmeler
