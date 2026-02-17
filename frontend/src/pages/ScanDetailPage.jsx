@@ -290,6 +290,28 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
+      {/* Failure Reason Alert */}
+      {scan.status === 'failed' && scan.failure_reason && (
+        <Card className="border-red-500/50 bg-red-500/5" data-testid="failure-reason-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg text-red-400">
+              <XCircle className="h-5 w-5" />
+              {t('scan_failed') || 'Tarama Başarısız'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 rounded-md bg-red-500/10 border border-red-500/30">
+              <p className="text-sm text-red-300 font-mono whitespace-pre-wrap">
+                {scan.failure_reason}
+              </p>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {t('failure_reason_hint') || 'Bu hata tarama sırasında oluştu. Hedefinizi kontrol edip yeniden tarama yapabilirsiniz.'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Iteration Selector */}
       {scan.current_iteration > 1 && (
         <Card data-testid="iteration-selector-card">
