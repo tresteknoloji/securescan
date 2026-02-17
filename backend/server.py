@@ -663,7 +663,7 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
             {"$set": {
                 "status": "failed", 
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-                "error_message": error_msg
+                "failure_reason": error_msg
             }}
         )
     finally:
