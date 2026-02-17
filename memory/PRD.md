@@ -177,6 +177,8 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - [x] Rapor indirme "Method Not Allowed" hatası - ✅ Düzeltildi
 - [x] CVE senkronizasyonu pagination - ✅ Düzeltildi
 - [x] Scan Iterations & On-Demand Reports - ✅ Düzeltildi (2026-02-16)
+- [x] CVE referansları raporda görünmüyor - ✅ Düzeltildi (2026-02-17)
+- [x] Başarısız tarama nedeni UI'da gösterilmiyor - ✅ Düzeltildi (2026-02-17)
 - [ ] Sunucuya Nmap kurulumu
 - [ ] Reseller olarak müşteri hesabına giriş ("Login as Customer")
 
