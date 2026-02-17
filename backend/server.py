@@ -552,7 +552,12 @@ async def _run_scan_async(scan_id: str, targets: List[dict], config: dict):
                     if cve_doc and cve_doc.get("references"):
                         # Filter to only http/https references
                         all_refs = cve_doc.get("references", [])
-                        http_refs = [r for r in all_refs if isinstance(r, str) and (r.startswith("http://") or r.startswith("https://"))]
+                        http_refs = []
+                        for r in all_refs:
+                            # Handle both object format {url: "..."} and string format
+                            url = r.get("url") if isinstance(r, dict) else r if isinstance(r, str) else None
+                            if url and (url.startswith("http://") or url.startswith("https://")):
+                                http_refs.append(url)
                         references = http_refs[:3]  # Limit to 3 references
                 
                 # Calculate Real Risk Score
