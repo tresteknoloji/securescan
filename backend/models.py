@@ -136,6 +136,7 @@ class Scan(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utc_now)
+    failure_reason: Optional[str] = None  # Error message if scan failed
     
     # Iteration tracking
     current_iteration: int = 1
@@ -173,6 +174,7 @@ class ScanResponse(BaseModel):
     medium_count: int = 0
     low_count: int = 0
     info_count: int = 0
+    failure_reason: Optional[str] = None
 
 # ============== Vulnerability/Finding Models ==============
 class Vulnerability(BaseModel):
