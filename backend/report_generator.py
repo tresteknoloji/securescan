@@ -53,8 +53,10 @@ def get_first_http_reference(references: list) -> str:
     if not references:
         return ""
     for ref in references:
-        if isinstance(ref, str) and (ref.startswith("http://") or ref.startswith("https://")):
-            return ref
+        # Handle both object format {url: "..."} and string format
+        url = ref.get("url") if isinstance(ref, dict) else ref if isinstance(ref, str) else None
+        if url and (url.startswith("http://") or url.startswith("https://")):
+            return url
     return ""
 
 
