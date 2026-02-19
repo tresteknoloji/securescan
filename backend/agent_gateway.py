@@ -152,6 +152,20 @@ class AgentGateway:
                 {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
             )
         
+        elif msg_type == "heartbeat":
+            # Task heartbeat - agent is still working on a long-running task
+            task_id = message.get("task_id")
+            await self.db.agents.update_one(
+                {"id": agent_id},
+                {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}}
+            )
+            if task_id:
+                await self.db.agent_tasks.update_one(
+                    {"id": task_id},
+                    {"$set": {"last_heartbeat": datetime.now(timezone.utc).isoformat()}}
+                )
+            logger.debug(f"Heartbeat from agent {agent_id} for task {task_id}")
+        
         elif msg_type == "system_info":
             # Agent reports its system information
             await self.db.agents.update_one(
