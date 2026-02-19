@@ -436,17 +436,6 @@ export default function AgentsPage() {
                 data-testid="agent-name-input"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="networks">{txt.internal_networks}</Label>
-              <Input
-                id="networks"
-                placeholder={txt.internal_networks_placeholder}
-                value={newAgent.internal_networks}
-                onChange={(e) => setNewAgent({ ...newAgent, internal_networks: e.target.value })}
-                data-testid="agent-networks-input"
-              />
-              <p className="text-xs text-muted-foreground">{txt.internal_networks_hint}</p>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
