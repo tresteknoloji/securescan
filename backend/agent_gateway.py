@@ -357,7 +357,6 @@ class AgentGateway:
         
         iteration = scan.get("current_iteration", 1)
         ports = result.get("ports", [])
-        targets_scanned = result.get("targets_scanned", [])
         
         # New enhanced findings from agent
         ssl_findings = result.get("ssl_findings", [])
