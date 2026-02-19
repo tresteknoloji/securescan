@@ -1340,7 +1340,7 @@ async def create_agent(
     agent_dict["updated_at"] = agent_dict["updated_at"].isoformat()
     
     await db.agents.insert_one(agent_dict)
-    logger.info(f"Agent created: {agent.name} for user {current_user['id']}")
+    logger.info(f"Agent created: {agent.name} for user {current_user['sub']}")
     
     # Generate install command
     base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
