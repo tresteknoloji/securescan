@@ -608,113 +608,339 @@ class AgentGateway:
     ) -> list:
         """
         Look up CVEs in local database for a service/version combination.
-        Also checks CISA KEV status.
+        Uses proper version range matching to avoid false positives.
         """
         vulnerabilities = []
         
-        # Build search terms
-        search_terms = []
+        import re
+        
         service_lower = service.lower()
         version_lower = version.lower()
         
-        # Extract product and version info
-        # Common patterns: "OpenSSH 8.9p1", "Apache httpd 2.4.52", "nginx 1.18.0"
-        import re
+        # Extract product name and version with proper parsing
+        product_info = self._extract_product_version(version_lower, service_lower)
         
-        # Try to extract product name and version
-        product_patterns = [
-            r'(openssh)[_\s]*([\d.p]+)',
-            r'(apache)[/\s]*([\d.]+)',
-            r'(nginx)[/\s]*([\d.]+)',
-            r'(mysql)[/\s]*([\d.]+)',
-            r'(postgresql)[/\s]*([\d.]+)',
-            r'(microsoft-ds|smb)',
-            r'(proftpd)[/\s]*([\d.]+)',
-            r'(vsftpd)[/\s]*([\d.]+)',
-            r'(exim)[/\s]*([\d.]+)',
-            r'(postfix)',
-            r'(iis)[/\s]*([\d.]+)',
-        ]
-        
-        for pattern in product_patterns:
-            match = re.search(pattern, version_lower)
-            if match:
-                product = match.group(1)
-                ver = match.group(2) if len(match.groups()) > 1 else ""
-                search_terms.append(product)
-                if ver:
-                    search_terms.append(f"{product} {ver}")
-                break
-        
-        # Also use service name
-        if service_lower and service_lower not in search_terms:
-            search_terms.append(service_lower)
-        
-        if not search_terms:
+        if not product_info:
             return vulnerabilities
         
-        # Search CVE database
-        for term in search_terms[:3]:  # Limit searches
-            try:
-                # Search in CVE descriptions
-                cve_query = {
-                    "$or": [
-                        {"description": {"$regex": term, "$options": "i"}},
-                        {"cve_id": {"$regex": term, "$options": "i"}}
-                    ]
-                }
-                
-                # Get matching CVEs (limit to avoid too many)
-                cves = await self.db.cves.find(
-                    cve_query, 
-                    {"_id": 0, "cve_id": 1, "description": 1, "cvss_score": 1, "severity": 1, "is_kev": 1, "references": 1}
-                ).limit(10).to_list(10)
-                
-                for cve in cves:
-                    # Skip if already added
-                    if any(v.get("cve_id") == cve["cve_id"] for v in vulnerabilities):
-                        continue
-                    
-                    cvss = cve.get("cvss_score", 0)
-                    severity = cve.get("severity", "medium")
-                    if not severity:
-                        if cvss >= 9.0:
-                            severity = "critical"
-                        elif cvss >= 7.0:
-                            severity = "high"
-                        elif cvss >= 4.0:
-                            severity = "medium"
-                        else:
-                            severity = "low"
-                    
-                    # Get references
-                    refs = cve.get("references", [])
-                    ref_urls = []
-                    for ref in refs[:3]:
-                        if isinstance(ref, dict):
-                            ref_urls.append(ref.get("url", ""))
-                        elif isinstance(ref, str):
-                            ref_urls.append(ref)
-                    
-                    vulnerabilities.append({
-                        "target_id": target_id,
-                        "target_value": target_value,
-                        "severity": severity,
-                        "title": f"{cve['cve_id']} - {service}",
-                        "description": cve.get("description", "")[:500],
-                        "port": port,
-                        "service": service,
-                        "cve_id": cve["cve_id"],
-                        "cvss_score": cvss,
-                        "is_kev": cve.get("is_kev", False),
-                        "references": ref_urls,
-                        "evidence": f"Service: {service} Version: {version}"
-                    })
-                    
-            except Exception as e:
-                logger.error(f"CVE lookup error for {term}: {e}")
+        product_name = product_info.get("product")
+        detected_version = product_info.get("version")
+        
+        if not product_name or not detected_version:
+            return vulnerabilities
+        
+        logger.info(f"CVE lookup for {product_name} version {detected_version}")
+        
+        # Only look up CVEs if we have specific version info
+        # Use CPE-based lookup if available, otherwise use smart description matching
+        cve_vulns = await self._cpe_based_cve_lookup(
+            product_name, detected_version, port, target_id, target_value, service, version
+        )
+        vulnerabilities.extend(cve_vulns)
         
         return vulnerabilities
+    
+    def _extract_product_version(self, version_str: str, service: str) -> dict:
+        """
+        Extract product name and normalized version from banner string.
+        Returns dict with 'product' and 'version' keys.
+        """
+        import re
+        
+        # Product patterns with version extraction
+        patterns = {
+            'openssh': r'openssh[_\s]*([\d]+\.[\d]+(?:p\d+)?)',
+            'apache': r'apache(?:/|\s|httpd\s)*([\d]+\.[\d]+\.[\d]+)',
+            'nginx': r'nginx[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'mysql': r'mysql[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'mariadb': r'mariadb[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'postgresql': r'postgres(?:ql)?[/\s]*([\d]+\.[\d]+)',
+            'proftpd': r'proftpd[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'vsftpd': r'vsftpd[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'exim': r'exim[/\s]*([\d]+\.[\d]+)',
+            'postfix': r'postfix',
+            'iis': r'(?:microsoft-iis|iis)[/\s]*([\d]+\.[\d]+)',
+            'openssl': r'openssl[/\s]*([\d]+\.[\d]+\.[\d]+[a-z]*)',
+            'php': r'php[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'tomcat': r'(?:apache-coyote|tomcat)[/\s]*([\d]+\.[\d]+\.[\d]+)',
+            'jetty': r'jetty[/\s]*([\d]+\.[\d]+\.[\d]+)',
+        }
+        
+        for product, pattern in patterns.items():
+            match = re.search(pattern, version_str, re.IGNORECASE)
+            if match:
+                ver = match.group(1) if match.lastindex else ""
+                return {"product": product, "version": ver}
+        
+        # Fallback: use service name if recognizable
+        if service in ['ssh', 'ftp', 'http', 'https', 'smtp', 'mysql', 'postgresql']:
+            return {"product": service, "version": ""}
+        
+        return {}
+    
+    def _parse_version(self, version_str: str) -> tuple:
+        """
+        Parse version string into comparable tuple.
+        Examples: "8.9p1" -> (8, 9, 1), "2.4.52" -> (2, 4, 52)
+        """
+        import re
+        
+        # Clean version string
+        version_str = version_str.lower().strip()
+        
+        # Remove common suffixes like 'p1', 'ubuntu', 'debian', etc.
+        # but keep the patch number if present
+        patch_match = re.search(r'p(\d+)', version_str)
+        patch_num = int(patch_match.group(1)) if patch_match else 0
+        
+        # Extract numeric parts
+        parts = re.findall(r'(\d+)', version_str.split('ubuntu')[0].split('debian')[0].split('el')[0])
+        
+        if not parts:
+            return (0, 0, 0)
+        
+        # Convert to integers, pad with zeros
+        int_parts = [int(p) for p in parts[:3]]
+        while len(int_parts) < 3:
+            int_parts.append(0)
+        
+        # Add patch number as 4th element for OpenSSH-style versioning
+        if patch_num > 0 and len(int_parts) >= 2:
+            int_parts[2] = patch_num
+        
+        return tuple(int_parts[:3])
+    
+    def _version_in_range(self, detected_ver: str, affected_range: str) -> bool:
+        """
+        Check if detected version falls within affected version range.
+        Supports formats like:
+        - "< 2.9" or "<= 2.9"
+        - "2.0 - 2.9"
+        - "before 2.9"
+        - "through 2.9"
+        - "2.x"
+        """
+        import re
+        
+        detected_tuple = self._parse_version(detected_ver)
+        affected_lower = affected_range.lower()
+        
+        # Pattern: "< X.Y" or "<= X.Y"
+        lt_match = re.search(r'<\s*=?\s*([\d.p]+)', affected_lower)
+        if lt_match:
+            max_ver = self._parse_version(lt_match.group(1))
+            if '<=' in affected_lower:
+                return detected_tuple <= max_ver
+            return detected_tuple < max_ver
+        
+        # Pattern: "before X.Y" or "through X.Y" or "prior to X.Y"
+        before_match = re.search(r'(?:before|through|prior to|earlier than)\s*([\d.p]+)', affected_lower)
+        if before_match:
+            max_ver = self._parse_version(before_match.group(1))
+            return detected_tuple <= max_ver
+        
+        # Pattern: "X.Y and earlier"
+        earlier_match = re.search(r'([\d.p]+)\s*and\s*(?:earlier|before|prior)', affected_lower)
+        if earlier_match:
+            max_ver = self._parse_version(earlier_match.group(1))
+            return detected_tuple <= max_ver
+        
+        # Pattern: "X.Y - Z.W" (range)
+        range_match = re.search(r'([\d.p]+)\s*(?:-|to)\s*([\d.p]+)', affected_lower)
+        if range_match:
+            min_ver = self._parse_version(range_match.group(1))
+            max_ver = self._parse_version(range_match.group(2))
+            return min_ver <= detected_tuple <= max_ver
+        
+        # Pattern: "X.x" (any minor version)
+        x_match = re.search(r'^([\d]+)\.x', affected_lower)
+        if x_match:
+            major = int(x_match.group(1))
+            return detected_tuple[0] == major
+        
+        # Exact version match
+        exact_match = re.search(r'^([\d.p]+)$', affected_lower.strip())
+        if exact_match:
+            exact_ver = self._parse_version(exact_match.group(1))
+            return detected_tuple == exact_ver
+        
+        return False
+    
+    async def _cpe_based_cve_lookup(
+        self, product: str, version: str, port: int, 
+        target_id: str, target_value: str, service: str, full_version: str
+    ) -> list:
+        """
+        Smart CVE lookup with version range validation.
+        Only returns CVEs that actually affect the detected version.
+        """
+        vulnerabilities = []
+        detected_ver_tuple = self._parse_version(version)
+        
+        logger.info(f"Checking CVEs for {product} {version} (parsed: {detected_ver_tuple})")
+        
+        # Build query - search for product in description but we'll validate version
+        cve_query = {
+            "description": {"$regex": product, "$options": "i"}
+        }
+        
+        # Get potentially matching CVEs
+        try:
+            cves = await self.db.cves.find(
+                cve_query,
+                {"_id": 0, "cve_id": 1, "description": 1, "cvss_score": 1, 
+                 "severity": 1, "is_kev": 1, "references": 1, "affected_versions": 1}
+            ).limit(100).to_list(100)
+        except Exception as e:
+            logger.error(f"CVE database query error: {e}")
+            return vulnerabilities
+        
+        import re
+        
+        for cve in cves:
+            cve_id = cve.get("cve_id", "")
+            description = cve.get("description", "").lower()
+            
+            # Skip if this CVE is for a different product with similar name
+            # e.g., skip "OpenSSH-client" CVEs when checking "OpenSSH" server
+            if not self._is_relevant_cve(product, description):
+                continue
+            
+            # Extract version info from CVE description
+            affected = self._extract_affected_versions(description, product)
+            
+            if not affected:
+                # No clear version info in description - skip to avoid false positives
+                continue
+            
+            # Check if detected version is actually affected
+            is_affected = False
+            for affected_range in affected:
+                if self._version_in_range(version, affected_range):
+                    is_affected = True
+                    break
+            
+            if not is_affected:
+                # Version not in affected range - skip
+                logger.debug(f"Skipping {cve_id}: {product} {version} not in affected range {affected}")
+                continue
+            
+            # This CVE actually affects our version
+            cvss = cve.get("cvss_score", 0)
+            severity = cve.get("severity", "medium")
+            if not severity:
+                if cvss >= 9.0:
+                    severity = "critical"
+                elif cvss >= 7.0:
+                    severity = "high"
+                elif cvss >= 4.0:
+                    severity = "medium"
+                else:
+                    severity = "low"
+            
+            # Get references
+            refs = cve.get("references", [])
+            ref_urls = []
+            for ref in refs[:3]:
+                if isinstance(ref, dict):
+                    ref_urls.append(ref.get("url", ""))
+                elif isinstance(ref, str):
+                    ref_urls.append(ref)
+            
+            vulnerabilities.append({
+                "target_id": target_id,
+                "target_value": target_value,
+                "severity": severity,
+                "title": f"{cve_id} - {product.upper()}",
+                "description": cve.get("description", "")[:500],
+                "port": port,
+                "service": service,
+                "cve_id": cve_id,
+                "cvss_score": cvss,
+                "is_kev": cve.get("is_kev", False),
+                "references": ref_urls,
+                "evidence": f"Service: {service} Version: {full_version} | Affected: {', '.join(affected)}"
+            })
+            
+            # Limit to 10 CVEs per service to avoid report bloat
+            if len(vulnerabilities) >= 10:
+                break
+        
+        logger.info(f"Found {len(vulnerabilities)} applicable CVEs for {product} {version}")
+        return vulnerabilities
+    
+    def _is_relevant_cve(self, product: str, description: str) -> bool:
+        """
+        Check if CVE description is actually relevant to our product.
+        Helps avoid false positives from similar product names.
+        """
+        product_lower = product.lower()
+        
+        # Product-specific relevance checks
+        if product_lower == "openssh":
+            # Must mention "openssh" specifically, not just "ssh"
+            if "openssh" not in description:
+                return False
+            # Skip client-only vulnerabilities when checking server
+            if "ssh client" in description and "server" not in description:
+                return False
+        
+        if product_lower == "apache":
+            # Must mention apache httpd, not other apache projects
+            if "apache" in description:
+                # Exclude Apache Struts, Tomcat, etc. unless explicitly httpd
+                non_httpd = ["struts", "tomcat", "kafka", "spark", "cassandra", "solr", "zookeeper"]
+                for other in non_httpd:
+                    if other in description and "httpd" not in description:
+                        return False
+        
+        return True
+    
+    def _extract_affected_versions(self, description: str, product: str) -> list:
+        """
+        Extract affected version ranges from CVE description.
+        Returns list of version range strings.
+        """
+        import re
+        
+        affected = []
+        
+        # Common patterns for version ranges in CVE descriptions
+        patterns = [
+            # "OpenSSH before 8.9"
+            rf'{product}\s+(?:versions?\s+)?before\s+([\d.p]+)',
+            # "OpenSSH through 8.9" or "OpenSSH 8.9 and earlier"
+            rf'{product}\s+(?:versions?\s+)?(?:through|up to)\s+([\d.p]+)',
+            rf'{product}\s+([\d.p]+)\s+and\s+(?:earlier|before|prior)',
+            # "OpenSSH < 8.9" or "OpenSSH <= 8.9"
+            rf'{product}\s+<\s*=?\s*([\d.p]+)',
+            # "OpenSSH 7.x"
+            rf'{product}\s+([\d]+\.x)',
+            # "OpenSSH 7.0 to 8.9"
+            rf'{product}\s+([\d.p]+)\s+(?:to|-)\s+([\d.p]+)',
+            # "in OpenSSH 8.9"
+            rf'in\s+{product}\s+([\d.p]+)',
+            # "affects OpenSSH 8.9"
+            rf'affects?\s+{product}\s+([\d.p]+)',
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, description, re.IGNORECASE)
+            for match in matches:
+                if isinstance(match, tuple):
+                    # Range pattern
+                    affected.append(f"{match[0]} - {match[1]}")
+                else:
+                    # Single version or "before X"
+                    # Check context for "before/through" keywords
+                    if 'before' in pattern or 'through' in pattern or '<' in pattern:
+                        affected.append(f"<= {match}")
+                    elif 'earlier' in pattern or 'prior' in pattern:
+                        affected.append(f"<= {match}")
+                    else:
+                        affected.append(match)
+        
+        return affected
     
     def is_agent_online(self, agent_id: str) -> bool:
         """Check if agent is currently connected"""
