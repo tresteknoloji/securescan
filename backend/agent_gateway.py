@@ -344,8 +344,8 @@ class AgentGateway:
     async def process_scan_results(self, scan_id: str, result: dict):
         """
         Process scan results received from agent.
-        Performs CVE matching, KEV checking, and vulnerability assessment
-        just like the local scanner does.
+        Performs CVE matching, KEV checking, and vulnerability assessment.
+        Now also processes SSL, NSE, and Web findings from enhanced agent scanning.
         """
         logger.info(f"Processing scan results for {scan_id}")
         
@@ -359,7 +359,13 @@ class AgentGateway:
         ports = result.get("ports", [])
         targets_scanned = result.get("targets_scanned", [])
         
-        logger.info(f"Processing {len(ports)} ports from {len(targets_scanned)} targets")
+        # New enhanced findings from agent
+        ssl_findings = result.get("ssl_findings", [])
+        nse_findings = result.get("nse_findings", [])
+        web_findings = result.get("web_findings", [])
+        
+        logger.info(f"Processing {len(ports)} ports, {len(ssl_findings)} SSL findings, "
+                   f"{len(nse_findings)} NSE findings, {len(web_findings)} web findings")
         
         # Get target details for mapping
         target_ids = scan.get("target_ids", [])
@@ -392,6 +398,94 @@ class AgentGateway:
             )
             all_vulnerabilities.extend(port_vulns)
         
+        # Process SSL/TLS findings from agent
+        for ssl_finding in ssl_findings:
+            target_value = ssl_finding.get("target", "")
+            target_data = target_map.get(target_value, {})
+            target_id = target_data.get("id", "")
+            
+            all_vulnerabilities.append({
+                "target_id": target_id,
+                "target_value": target_value,
+                "severity": ssl_finding.get("severity", "medium"),
+                "title": ssl_finding.get("title", "SSL/TLS Issue"),
+                "description": ssl_finding.get("description", ""),
+                "port": ssl_finding.get("port"),
+                "service": "ssl/tls",
+                "evidence": ssl_finding.get("evidence", ""),
+                "source": "ssl_scan"
+            })
+        
+        # Process NSE vulnerability findings from agent
+        for nse_finding in nse_findings:
+            target_value = nse_finding.get("target", "")
+            target_data = target_map.get(target_value, {})
+            target_id = target_data.get("id", "")
+            
+            cve_id = nse_finding.get("cve_id")
+            
+            # If CVE found, try to get additional info from local database
+            references = []
+            cvss_score = None
+            is_kev = False
+            
+            if cve_id:
+                cve_doc = await self.db.cves.find_one({"cve_id": cve_id}, {"_id": 0})
+                if cve_doc:
+                    cvss_score = cve_doc.get("cvss_score")
+                    is_kev = cve_doc.get("is_kev", False)
+                    refs = cve_doc.get("references", [])
+                    for ref in refs[:3]:
+                        if isinstance(ref, dict):
+                            references.append(ref.get("url", ""))
+                        elif isinstance(ref, str):
+                            references.append(ref)
+            
+            all_vulnerabilities.append({
+                "target_id": target_id,
+                "target_value": target_value,
+                "severity": nse_finding.get("severity", "medium"),
+                "title": nse_finding.get("title", "Vulnerability Detected"),
+                "description": nse_finding.get("description", ""),
+                "port": nse_finding.get("port"),
+                "service": "nse",
+                "cve_id": cve_id,
+                "cvss_score": cvss_score,
+                "is_kev": is_kev,
+                "references": references,
+                "evidence": nse_finding.get("evidence", ""),
+                "source": "nse_scan"
+            })
+        
+        # Process Web vulnerability findings from agent
+        for web_finding in web_findings:
+            target_value = web_finding.get("target", "")
+            target_data = target_map.get(target_value, {})
+            target_id = target_data.get("id", "")
+            
+            all_vulnerabilities.append({
+                "target_id": target_id,
+                "target_value": target_value,
+                "severity": web_finding.get("severity", "medium"),
+                "title": web_finding.get("title", "Web Vulnerability"),
+                "description": web_finding.get("description", ""),
+                "port": web_finding.get("port"),
+                "service": "http",
+                "evidence": web_finding.get("evidence", ""),
+                "source": "web_scan"
+            })
+        
+        # Deduplicate vulnerabilities by title and target
+        seen = set()
+        unique_vulnerabilities = []
+        for vuln in all_vulnerabilities:
+            key = (vuln.get("target_value"), vuln.get("title"), vuln.get("port"))
+            if key not in seen:
+                seen.add(key)
+                unique_vulnerabilities.append(vuln)
+        
+        all_vulnerabilities = unique_vulnerabilities
+        
         # Save all vulnerabilities to database
         severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
         
@@ -415,6 +509,7 @@ class AgentGateway:
             )
             vuln_dict = vuln_obj.model_dump()
             vuln_dict["created_at"] = vuln_dict["created_at"].isoformat()
+            vuln_dict["source"] = vuln.get("source", "port_scan")
             await self.db.vulnerabilities.insert_one(vuln_dict)
             
             sev = vuln.get("severity", "info").lower()
@@ -434,11 +529,15 @@ class AgentGateway:
                 "medium_count": severity_counts["medium"],
                 "low_count": severity_counts["low"],
                 "info_count": severity_counts["info"],
-                "open_ports_by_target": open_ports_by_target
+                "open_ports_by_target": open_ports_by_target,
+                "ssl_findings_count": len(ssl_findings),
+                "nse_findings_count": len(nse_findings),
+                "web_findings_count": len(web_findings)
             }}
         )
         
-        logger.info(f"Scan {scan_id} completed with {len(all_vulnerabilities)} vulnerabilities")
+        logger.info(f"Scan {scan_id} completed with {len(all_vulnerabilities)} vulnerabilities "
+                   f"(SSL: {len(ssl_findings)}, NSE: {len(nse_findings)}, Web: {len(web_findings)})")
     
     async def _process_port_vulnerabilities(
         self, port_info: dict, target_id: str, target_value: str, iteration: int, scan_id: str
