@@ -14,6 +14,7 @@ import ReportsPage from './pages/ReportsPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import CVEDatabasePage from './pages/CVEDatabasePage';
+import AgentsPage from './pages/AgentsPage';
 import { Loader2 } from 'lucide-react';
 
 // Theme Provider
