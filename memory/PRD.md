@@ -205,7 +205,8 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - [x] Scan Iterations & On-Demand Reports - ✅ Düzeltildi (2026-02-16)
 - [x] CVE referansları raporda görünmüyor - ✅ Düzeltildi (2026-02-17)
 - [x] Başarısız tarama nedeni UI'da gösterilmiyor - ✅ Düzeltildi (2026-02-17)
-- [ ] Sunucuya Nmap kurulumu
+- [x] Agent Sistemi Faz 1 & 2 - ✅ Tamamlandı (2026-02-17)
+- [ ] Agent Sistemi Faz 3 & 4 - Tarama entegrasyonu (Agent üzerinden tarama başlatma)
 - [ ] Reseller olarak müşteri hesabına giriş ("Login as Customer")
 
 ### P1 (Yüksek)
