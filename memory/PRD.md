@@ -285,6 +285,14 @@ CVE eşleştirmesi artık doğru versiyon aralığı kontrolü yapıyor:
   - Aktif Web Kontrolleri (SQLi, XSS, LFI, Directory Traversal)
   - Sensitive File Exposure (.env, .git/config, backup dosyaları)
   - Admin Panel Detection
+- [x] **CVE Version Range Matching - ✅ Tamamlandı (2026-02-19)**
+  - Semantic versioning ile doğru CVE eşleştirmesi
+  - False positive önleme (ör: OpenSSH 9.6p1 için CVE-2001-1459 yanlış raporlanmıyor)
+- [x] **UI/UX İyileştirmeleri - ✅ Tamamlandı (2026-02-19)**
+  - Agent version 1.0.3
+  - Agentlar sayfasında "Araçlar" yerine "Oluşturma Tarihi" gösterimi
+  - Tarama detay sayfasında Başlangıç/Bitiş/Süre bilgileri
+  - Raporlarda Başlangıç/Bitiş/Süre bilgileri
 - [ ] Reseller olarak müşteri hesabına giriş ("Login as Customer")
 
 ### P1 (Yüksek)
