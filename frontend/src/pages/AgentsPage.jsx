@@ -61,26 +61,22 @@ export default function AgentsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [newAgentToken, setNewAgentToken] = useState(null);
-  const [newAgent, setNewAgent] = useState({ name: '', internal_networks: '' });
+  const [newAgent, setNewAgent] = useState({ name: '' });
 
   const tr = {
     agents: 'Agentlar',
-    agents_desc: 'Uzak ağlarda tarama yapmak için agent yönetimi',
+    agents_desc: 'Uzak sunucularda tarama yapmak için agent yönetimi',
     add_agent: 'Yeni Agent',
     no_agents: 'Henüz agent eklenmemiş',
-    no_agents_desc: 'Dahili ağlarınızı taramak için bir agent ekleyin',
+    no_agents_desc: 'Uzak sunucularınızda tarama yapmak için bir agent ekleyin',
     agent_name: 'Agent Adı',
-    agent_name_placeholder: 'Örn: Ofis Ağı, AWS VPC',
-    internal_networks: 'Dahili Ağlar',
-    internal_networks_placeholder: '192.168.1.0/24, 10.0.0.0/8',
-    internal_networks_hint: 'Virgülle ayrılmış CIDR formatında ağlar',
+    agent_name_placeholder: 'Örn: Ofis Sunucusu, AWS EC2',
     create_agent: 'Agent Oluştur',
     cancel: 'İptal',
     online: 'Çevrimiçi',
     offline: 'Çevrimdışı',
     busy: 'Meşgul',
     last_seen: 'Son Görülme',
-    networks: 'Ağlar',
     tools: 'Araçlar',
     actions: 'İşlemler',
     delete_agent: 'Agentı Sil',
