@@ -1772,32 +1772,63 @@ class SecureScanAgent:
     
     async def run_port_scan(self, command: str, params: dict, task_id: str):
         """Run nmap scan with progress updates"""
-        target = params.get("target", "")
+        # Get targets - can be single target or list
+        targets = params.get("targets", [])
+        if not targets:
+            target = params.get("target", "")
+            targets = [target] if target else []
+        
+        if not targets:
+            return {{"error": "No targets specified", "ports": [], "vulnerabilities": []}}
+        
         port_range = params.get("port_range", "1-1000")
         scan_type = params.get("scan_type", "quick")
         
-        # Build nmap command
-        if scan_type == "quick":
-            cmd = f"nmap -sV -T4 --top-ports 100 {{target}}"
-        elif scan_type == "stealth":
-            cmd = f"nmap -sS -sV -T2 -p {{port_range}} {{target}}"
-        else:
-            cmd = f"nmap -sV -sC -T4 -p {{port_range}} {{target}}"
+        all_ports = []
+        all_vulnerabilities = []
         
-        logger.info(f"Running: {{cmd}}")
+        for target in targets:
+            if not target:
+                continue
+                
+            # Build nmap command
+            if scan_type == "quick":
+                cmd = f"nmap -sV -T4 --top-ports 100 {{target}}"
+            elif scan_type == "stealth":
+                cmd = f"nmap -sS -sV -T2 -p {{port_range}} {{target}}"
+            else:
+                cmd = f"nmap -sV -sC -T4 -p {{port_range}} {{target}}"
+            
+            logger.info(f"Running: {{cmd}}")
+            
+            # Send progress
+            await self.send({{"type": "task_progress", "task_id": task_id, "progress": 10}})
+            
+            process = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            output = stdout.decode()
+            
+            # Parse nmap output
+            ports = self.parse_nmap_output(output)
+            vulnerabilities = self.check_port_vulnerabilities(ports, target)
+            
+            # Add target info to ports
+            for port in ports:
+                port["target"] = target
+            
+            all_ports.extend(ports)
+            all_vulnerabilities.extend(vulnerabilities)
         
-        process = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        stdout, stderr = await process.communicate()
-        output = stdout.decode()
-        
-        # Parse nmap output
-        ports = self.parse_nmap_output(output)
-        vulnerabilities = self.check_port_vulnerabilities(ports, target)
+        return {{
+            "ports": all_ports,
+            "vulnerabilities": all_vulnerabilities,
+            "targets_scanned": targets
+        }}
         
         return {{
             "ports": ports,
