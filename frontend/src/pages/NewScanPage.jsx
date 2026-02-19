@@ -112,12 +112,24 @@ export default function NewScanPage() {
     e.preventDefault();
 
     if (selectedTargets.length === 0) {
-      toast.error('Please select at least one target');
+      toast.error(language === 'tr' ? 'En az bir hedef seçin' : 'Please select at least one target');
       return;
     }
 
     if (!scanName.trim()) {
-      toast.error('Please enter a scan name');
+      toast.error(language === 'tr' ? 'Tarama adı girin' : 'Please enter a scan name');
+      return;
+    }
+
+    if (!selectedAgent) {
+      toast.error(language === 'tr' ? 'Bir agent seçin' : 'Please select an agent');
+      return;
+    }
+
+    // Check if selected agent is online
+    const agent = agents.find(a => a.id === selectedAgent);
+    if (agent && agent.status !== 'online') {
+      toast.error(language === 'tr' ? 'Seçilen agent çevrimdışı' : 'Selected agent is offline');
       return;
     }
 
@@ -127,6 +139,7 @@ export default function NewScanPage() {
       const response = await api.post('/scans', {
         name: scanName,
         target_ids: selectedTargets,
+        agent_id: selectedAgent,
         config: {
           scan_type: config.scan_type,
           port_range: config.scan_type === 'quick' ? '1-100' : config.scan_type === 'full' ? '1-65535' : config.port_range,
@@ -136,7 +149,7 @@ export default function NewScanPage() {
         },
       });
 
-      toast.success('Scan started successfully');
+      toast.success(language === 'tr' ? 'Tarama başlatıldı' : 'Scan started successfully');
       navigate(`/scans/${response.data.id}`);
     } catch (error) {
       toast.error(error.response?.data?.detail || t('error'));
