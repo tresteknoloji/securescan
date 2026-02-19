@@ -2376,24 +2376,6 @@ class SecureScanAgent:
                     pass
         
         return findings
-                                error_content = e.read().decode('utf-8', errors='ignore').lower()
-                                for indicator in test["indicators"]:
-                                    if indicator.lower() in error_content:
-                                        findings.append({{
-                                            "target": target,
-                                            "port": port,
-                                            "type": "web",
-                                            "severity": test["severity"],
-                                            "title": f"{{test['name']}} Possible (Error-Based)",
-                                            "description": f"Server error suggests possible {{test['name']}} at {{path}}",
-                                            "evidence": f"URL: {{url}} | HTTP 500 with {{indicator}} in error"
-                                        }})
-                                        break
-                    except Exception as e:
-                        # Silently skip connection errors
-                        pass
-        
-        return findings
     
     def parse_nmap_output(self, output: str):
         """Parse nmap output to extract port info"""
