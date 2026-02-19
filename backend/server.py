@@ -1,7 +1,7 @@
 """
 Vulnerability Scanner API Server
 """
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, BackgroundTasks, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, BackgroundTasks, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
