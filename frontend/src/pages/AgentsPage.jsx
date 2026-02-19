@@ -326,7 +326,6 @@ export default function AgentsPage() {
               <TableRow>
                 <TableHead>{txt.agent_name}</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>{txt.networks}</TableHead>
                 <TableHead>{txt.os_info}</TableHead>
                 <TableHead>{txt.tools}</TableHead>
                 <TableHead>{txt.last_seen}</TableHead>
@@ -348,21 +347,6 @@ export default function AgentsPage() {
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(agent.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {agent.internal_networks?.slice(0, 2).map((net, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          <Network className="w-3 h-3 mr-1" />
-                          {net}
-                        </Badge>
-                      ))}
-                      {agent.internal_networks?.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{agent.internal_networks.length - 2}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
                   <TableCell>
                     <span className="text-sm">{agent.os_info || txt.unknown}</span>
                     {agent.agent_version && (
