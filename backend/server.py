@@ -1343,7 +1343,7 @@ async def create_agent(
     logger.info(f"Agent created: {agent.name} for user {current_user['sub']}")
     
     # Generate install command
-    base_url = os.environ.get("FRONTEND_URL", os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com"))
+    base_url = os.environ.get("FRONTEND_URL", os.environ.get("FRONTEND_URL", "https://your-panel.com"))
     install_command = f'curl -sSL {base_url}/api/agent/install.sh | sudo bash -s {plain_token}'
     
     return AgentWithToken(
@@ -1447,7 +1447,7 @@ async def regenerate_agent_token(agent_id: str, current_user: dict = Depends(get
         }}
     )
     
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
+    base_url = os.environ.get("FRONTEND_URL", "https://your-panel.com")
     install_command = f'curl -sSL {base_url}/api/agent/install.sh | sudo bash -s {plain_token}'
     
     return AgentWithToken(
@@ -1537,7 +1537,7 @@ async def agent_websocket(websocket: WebSocket, token: str = Query(...)):
 @api_router.get("/agent/install.sh")
 async def get_agent_install_script():
     """Get the agent installation script"""
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
+    base_url = os.environ.get("FRONTEND_URL", "https://your-panel.com")
     
     script = f'''#!/bin/bash
 # SecureScan Agent Installer
