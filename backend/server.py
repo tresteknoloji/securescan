@@ -2296,6 +2296,10 @@ class SecureScanAgent:
         ]
         
         for port in ports[:3]:  # Limit to 3 ports
+            # Send heartbeat at start of each port check
+            await self.send({{"type": "heartbeat", "task_id": task_id}})
+            logger.info(f"Web check heartbeat for port {{port}}")
+            
             protocol = "https" if port in [443, 8443, 4443] else "http"
             base_url = f"{{protocol}}://{{target}}:{{port}}"
             
