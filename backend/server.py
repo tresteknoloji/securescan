@@ -1710,7 +1710,7 @@ class SecureScanAgent:
                 "os_info": os_info,
                 "installed_tools": tools,
                 "detected_networks": networks,
-                "agent_version": "1.0.7",
+                "agent_version": "1.0.8",
                 "hostname": socket.gethostname(),
                 "ip_address": self.get_public_ip()
             }}
@@ -1732,7 +1732,7 @@ class SecureScanAgent:
         
         for service in ip_services:
             try:
-                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                 response = urllib.request.urlopen(req, timeout=5)
                 ip = response.read().decode('utf-8').strip()
                 if ip and len(ip) < 50:  # Basic validation
@@ -2322,7 +2322,7 @@ class SecureScanAgent:
                 try:
                     # Step 1: Get baseline response
                     baseline_url = f"{{base_url}}{{path}}?{{param}}={{value}}"
-                    req = urllib.request.Request(baseline_url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                    req = urllib.request.Request(baseline_url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                     try:
                         baseline_resp = urllib.request.urlopen(req, timeout=5, context=ctx)
                         baseline_content = baseline_resp.read().decode('utf-8', errors='ignore')
@@ -2332,7 +2332,7 @@ class SecureScanAgent:
                     
                     # Step 2: Test with SQL injection payload
                     sqli_url = f"{{base_url}}{{path}}?{{param}}={{value}}'"
-                    req = urllib.request.Request(sqli_url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                    req = urllib.request.Request(sqli_url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                     
                     try:
                         sqli_resp = urllib.request.urlopen(req, timeout=5, context=ctx)
@@ -2370,11 +2370,11 @@ class SecureScanAgent:
                         false_url = f"{{base_url}}{{path}}?{{param}}={{value}}' AND '1'='2"
                         
                         try:
-                            true_req = urllib.request.Request(true_url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                            true_req = urllib.request.Request(true_url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                             true_resp = urllib.request.urlopen(true_req, timeout=5, context=ctx)
                             true_len = len(true_resp.read())
                             
-                            false_req = urllib.request.Request(false_url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                            false_req = urllib.request.Request(false_url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                             false_resp = urllib.request.urlopen(false_req, timeout=5, context=ctx)
                             false_len = len(false_resp.read())
                             
@@ -2416,7 +2416,7 @@ class SecureScanAgent:
             for path, indicators in lfi_tests:
                 try:
                     url = f"{{base_url}}{{path}}"
-                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                     resp = urllib.request.urlopen(req, timeout=5, context=ctx)
                     content = resp.read().decode('utf-8', errors='ignore')
                     
@@ -2459,7 +2459,7 @@ class SecureScanAgent:
             for path, indicators in sensitive_files:
                 try:
                     url = f"{{base_url}}{{path}}"
-                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                     resp = urllib.request.urlopen(req, timeout=5, context=ctx)
                     content = resp.read().decode('utf-8', errors='ignore')
                     status = resp.getcode()
@@ -2489,7 +2489,7 @@ class SecureScanAgent:
             for path in admin_paths:
                 try:
                     url = f"{{base_url}}{{path}}"
-                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.7"}})
+                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
                     resp = urllib.request.urlopen(req, timeout=5, context=ctx)
                     status = resp.getcode()
                     
