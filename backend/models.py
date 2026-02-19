@@ -130,6 +130,7 @@ class Scan(BaseModel):
     user_id: str
     name: str
     target_ids: List[str]
+    agent_id: Optional[str] = None  # Agent that runs the scan
     config: ScanConfig = Field(default_factory=ScanConfig)
     status: ScanStatusType = "pending"
     progress: int = 0  # 0-100
