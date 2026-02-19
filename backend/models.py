@@ -153,6 +153,7 @@ class Scan(BaseModel):
 class ScanCreate(BaseModel):
     name: str
     target_ids: List[str]
+    agent_id: str  # Required - all scans run through agents
     config: Optional[ScanConfig] = None
 
 class ScanResponse(BaseModel):
@@ -160,6 +161,7 @@ class ScanResponse(BaseModel):
     user_id: str
     name: str
     target_ids: List[str]
+    agent_id: Optional[str] = None
     config: ScanConfig
     status: ScanStatusType
     progress: int
