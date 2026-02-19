@@ -21,7 +21,9 @@ from models import (
     Vulnerability, VulnerabilityResponse,
     SMTPConfig, SMTPConfigCreate, SMTPConfigResponse,
     BrandingSettings, BrandingSettingsCreate, BrandingSettingsResponse,
-    DashboardStats, TRANSLATIONS
+    DashboardStats, TRANSLATIONS,
+    Agent, AgentCreate, AgentUpdate, AgentResponse, AgentWithToken,
+    AgentTask, AgentTaskResponse
 )
 from auth import (
     verify_password, get_password_hash, create_access_token,
@@ -31,6 +33,7 @@ from scanner import VulnerabilityScanner, sync_cve_database
 from report_generator import generate_html_report, generate_pdf_report
 from email_service import send_email, get_scan_complete_email
 from risk_calculator import RiskCalculator, enrich_vulnerabilities_with_risk
+from agent_gateway import AgentGateway, get_agent_gateway, generate_agent_token, hash_token
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
