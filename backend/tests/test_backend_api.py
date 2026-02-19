@@ -260,15 +260,17 @@ class TestCVEEndpoints:
         )
         return response.json()["access_token"]
     
-    def test_cve_status(self, auth_token):
-        """Test CVE database status endpoint"""
+    def test_cve_stats(self, auth_token):
+        """Test CVE database stats endpoint"""
         headers = {"Authorization": f"Bearer {auth_token}"}
-        response = requests.get(f"{BASE_URL}/api/cve/status", headers=headers)
+        response = requests.get(f"{BASE_URL}/api/cve/stats", headers=headers)
         
         assert response.status_code == 200
         data = response.json()
         assert "total_cves" in data
-        print(f"✓ CVE database has {data['total_cves']} entries")
+        assert "kev_count" in data
+        assert "severity_counts" in data
+        print(f"✓ CVE database has {data['total_cves']} entries, {data['kev_count']} KEV")
 
 
 if __name__ == "__main__":
