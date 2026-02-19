@@ -199,6 +199,9 @@ class Vulnerability(BaseModel):
     solution: Optional[str] = None
     references: List[str] = Field(default_factory=list)
     raw_data: Optional[Dict[str, Any]] = None
+    evidence: Optional[str] = None  # Technical evidence of the finding
+    is_kev: bool = False  # Is in CISA Known Exploited Vulnerabilities
+    source: Optional[str] = None  # Source of finding: port_scan, ssl_scan, nse_scan, web_scan
     created_at: datetime = Field(default_factory=utc_now)
 
 class VulnerabilityResponse(BaseModel):
@@ -217,6 +220,9 @@ class VulnerabilityResponse(BaseModel):
     cvss_score: Optional[float] = None
     solution: Optional[str] = None
     references: List[str] = []
+    evidence: Optional[str] = None
+    is_kev: bool = False
+    source: Optional[str] = None
     created_at: datetime
 
 # ============== CVE Models ==============
