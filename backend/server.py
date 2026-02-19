@@ -1331,8 +1331,7 @@ async def create_agent(
     agent = Agent(
         customer_id=current_user["sub"],
         name=agent_data.name,
-        token=hashed_token,
-        internal_networks=agent_data.internal_networks
+        token=hashed_token
     )
     
     agent_dict = agent.model_dump()
@@ -1343,7 +1342,7 @@ async def create_agent(
     logger.info(f"Agent created: {agent.name} for user {current_user['sub']}")
     
     # Generate install command
-    base_url = os.environ.get("FRONTEND_URL", os.environ.get("FRONTEND_URL", "https://your-panel.com"))
+    base_url = os.environ.get("FRONTEND_URL", "https://your-panel.com")
     install_command = f'curl -sSL {base_url}/api/agent/install.sh | sudo bash -s {plain_token}'
     
     return AgentWithToken(
@@ -1352,7 +1351,6 @@ async def create_agent(
         name=agent.name,
         token=plain_token,  # Return plain token only once
         status=agent.status,
-        internal_networks=agent.internal_networks,
         is_active=agent.is_active,
         created_at=agent.created_at,
         install_command=install_command
