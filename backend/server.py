@@ -2180,39 +2180,6 @@ class SecureScanAgent:
         return findings
     
     async def run_web_checks(self, target: str, ports: list, task_id: str):
-                    "port": current_port or 445,
-                    "type": "nse",
-                    "severity": "critical",
-                    "title": "SMB Vulnerability Detected",
-                    "description": line.strip(),
-                    "evidence": line.strip()
-                }})
-            
-            if "http-vuln-" in line.lower():
-                findings.append({{
-                    "target": target,
-                    "port": current_port or 80,
-                    "type": "nse",
-                    "severity": "high",
-                    "title": "HTTP Vulnerability Detected",
-                    "description": line.strip(),
-                    "evidence": line.strip()
-                }})
-            
-            if "ftp-anon" in line.lower() and "allowed" in line.lower():
-                findings.append({{
-                    "target": target,
-                    "port": current_port or 21,
-                    "type": "nse",
-                    "severity": "high",
-                    "title": "Anonymous FTP Login Allowed",
-                    "description": "FTP server allows anonymous login. Sensitive files may be exposed.",
-                    "evidence": line.strip()
-                }})
-        
-        return findings
-    
-    async def run_web_checks(self, target: str, ports: list, task_id: str):
         """
         Run active web vulnerability checks with proper validation.
         Uses multi-step verification to avoid false positives.
