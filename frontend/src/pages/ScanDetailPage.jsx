@@ -510,27 +510,42 @@ export default function ScanDetailPage() {
                               CVSS: <span className="font-medium">{vuln.cvss_score}</span>
                             </span>
                           )}
-                          {vuln.is_kev && (
+                          {/* Confidence Badges */}
+                          {vuln.confidence === 'confirmed' && (
+                            <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Confirmed
+                            </Badge>
+                          )}
+                          {vuln.confidence === 'likely' && (
+                            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+                              Likely
+                            </Badge>
+                          )}
+                          {vuln.confidence === 'possible' && (
                             <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/50">
+                              Possible
+                            </Badge>
+                          )}
+                          {vuln.confidence === 'unlikely' && (
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/50">
+                              Unlikely
+                            </Badge>
+                          )}
+                          {vuln.confidence === 'informational' && (
+                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">
+                              Info Only
+                            </Badge>
+                          )}
+                          {vuln.is_kev && (
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/50">
                               <Flame className="mr-1 h-3 w-3" />
                               KEV
                             </Badge>
                           )}
-                          {vuln.is_verified && (
-                            <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
-                              Verified
-                            </Badge>
-                          )}
-                          {vuln.source === 'active_check' && (
-                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50">
-                              <Zap className="mr-1 h-3 w-3" />
-                              Active Check
-                            </Badge>
-                          )}
-                          {vuln.source === 'cpe_match' && (
-                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">
-                              <Fingerprint className="mr-1 h-3 w-3" />
-                              CPE Match
+                          {vuln.has_exploit_ref && (
+                            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50" title="Public exploit exists (informational)">
+                              Exploit Ref
                             </Badge>
                           )}
                           {vuln.source === 'ssl_scan' && (
