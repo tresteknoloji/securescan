@@ -728,7 +728,7 @@ async def cancel_scan(scan_id: str, current_user: dict = Depends(get_current_use
 async def rescan(scan_id: str, current_user: dict = Depends(get_current_user)):
     """
     Rescan - creates a new iteration under the same scan.
-    Saves current results to history and starts a fresh scan.
+    Saves current results to history and starts a fresh scan via agent.
     """
     scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
     if not scan:
@@ -739,6 +739,16 @@ async def rescan(scan_id: str, current_user: dict = Depends(get_current_user)):
     
     if scan.get("status") == "running":
         raise HTTPException(status_code=400, detail="Scan is already running")
+    
+    # Check if scan has an agent assigned
+    agent_id = scan.get("agent_id")
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="Bu tarama bir agent'a atanmamış. Lütfen yeni bir tarama oluşturun.")
+    
+    # Check if agent is online
+    gateway = get_agent_gateway(db)
+    if not gateway.is_agent_online(agent_id):
+        raise HTTPException(status_code=400, detail="Agent çevrimdışı. Lütfen agent'ın çalıştığından emin olun.")
     
     # Get current iteration
     current_iteration = scan.get("current_iteration", 1)
@@ -771,9 +781,9 @@ async def rescan(scan_id: str, current_user: dict = Depends(get_current_user)):
             {"$set": {
                 "current_iteration": new_iteration,
                 "iteration_history": history,
-                "status": "pending",
+                "status": "running",
                 "progress": 0,
-                "started_at": None,
+                "started_at": datetime.now(timezone.utc).isoformat(),
                 "completed_at": None,
                 "total_vulnerabilities": 0,
                 "critical_count": 0,
@@ -793,29 +803,47 @@ async def rescan(scan_id: str, current_user: dict = Depends(get_current_user)):
         new_iteration = current_iteration
         await db.scans.update_one(
             {"id": scan_id},
-            {"$set": {"status": "pending", "progress": 0}}
+            {"$set": {
+                "status": "running",
+                "progress": 0,
+                "started_at": datetime.now(timezone.utc).isoformat()
+            }}
         )
     
     # Get targets for this scan
     target_ids = scan.get("target_ids", [])
     targets = await db.targets.find({"id": {"$in": target_ids}}, {"_id": 0}).to_list(100)
-    targets = [{"id": t["id"], "value": t["value"], "target_type": t["target_type"]} for t in targets]
     
     if not targets:
         raise HTTPException(status_code=400, detail="No valid targets found")
     
-    # Get config with new iteration
+    # Get config
     config = scan.get("config", {})
     if isinstance(config, dict):
         config_dict = config
     else:
         config_dict = config.model_dump() if hasattr(config, 'model_dump') else dict(config)
     
-    # Add iteration to config for tracking
-    config_dict["iteration"] = new_iteration
+    # Create task for agent
+    target_values = [t["value"] for t in targets]
     
-    # Start scan in background
-    asyncio.create_task(run_scan_wrapper(scan_id, targets, config_dict))
+    task = await gateway.create_task(
+        agent_id=agent_id,
+        task_type="port_scan",
+        command="nmap_scan",
+        parameters={
+            "targets": target_values,
+            "target_details": targets,
+            "scan_type": config_dict.get("scan_type", "quick"),
+            "port_range": config_dict.get("port_range", "1-1000"),
+            "check_ssl": config_dict.get("check_ssl", True),
+            "check_cve": config_dict.get("check_cve", True),
+            "iteration": new_iteration,
+        },
+        scan_id=scan_id
+    )
+    
+    logger.info(f"Rescan {scan_id} (iteration {new_iteration}) started via agent {agent_id}, task: {task['id']}")
     
     # Return updated scan
     updated_scan = await db.scans.find_one({"id": scan_id}, {"_id": 0})
