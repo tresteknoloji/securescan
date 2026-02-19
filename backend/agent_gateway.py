@@ -1051,7 +1051,7 @@ class AgentGateway:
             # "Product version 8.9"
             rf'{product_pattern}\s+version\s+([\d.p]+)',
             # Specific patterns for "X.Y.Z to A.B.C" without product prefix
-            rf'([\d]+\.[\d]+\.[\d]+)\s+to\s+([\d]+\.[\d]+\.[\d]+)',
+            r'([\d]+\.[\d]+\.[\d]+)\s+to\s+([\d]+\.[\d]+\.[\d]+)',
         ]
         
         for pattern in patterns:
