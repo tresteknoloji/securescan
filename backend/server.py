@@ -1343,7 +1343,7 @@ async def create_agent(
     logger.info(f"Agent created: {agent.name} for user {current_user['sub']}")
     
     # Generate install command
-    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
+    base_url = os.environ.get("FRONTEND_URL", os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com"))
     install_command = f'curl -sSL {base_url}/api/agent/install.sh | sudo bash -s {plain_token}'
     
     return AgentWithToken(
