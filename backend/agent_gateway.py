@@ -42,8 +42,8 @@ class AgentGateway:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
         self.connections: Dict[str, WebSocket] = {}
-        self.heartbeat_interval = 30  # seconds
-        self.task_timeout = 300  # 5 minutes
+        self.heartbeat_interval = 60  # seconds - increased for long-running scans
+        self.task_timeout = 900  # 15 minutes - allows for comprehensive scans
     
     async def authenticate_agent(self, token: str) -> Optional[dict]:
         """Authenticate agent by token and return agent data"""
