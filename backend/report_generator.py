@@ -687,8 +687,16 @@ def generate_html_report(
                 <td>{report_iteration} {l['of']} {total_iterations}</td>
             </tr>
             <tr>
-                <td>{l['scan_date']}</td>
-                <td>{scan.get('created_at', datetime.now(timezone.utc).isoformat())[:19].replace('T', ' ')} UTC</td>
+                <td>{l['start_time']}</td>
+                <td>{scan.get('started_at', scan.get('created_at', datetime.now(timezone.utc).isoformat()))[:19].replace('T', ' ')} UTC</td>
+            </tr>
+            <tr>
+                <td>{l['end_time']}</td>
+                <td>{scan.get('completed_at', '-')[:19].replace('T', ' ') if scan.get('completed_at') else '-'} UTC</td>
+            </tr>
+            <tr>
+                <td>{l['duration']}</td>
+                <td>{calculate_duration(scan.get('started_at'), scan.get('completed_at'), lang)}</td>
             </tr>
             <tr>
                 <td>{l['targets_scanned']}</td>
