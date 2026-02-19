@@ -1710,7 +1710,7 @@ class SecureScanAgent:
                 "os_info": os_info,
                 "installed_tools": tools,
                 "detected_networks": networks,
-                "agent_version": "1.0.8",
+                "agent_version": "1.0.9",
                 "hostname": socket.gethostname(),
                 "ip_address": self.get_public_ip()
             }}
@@ -1732,7 +1732,7 @@ class SecureScanAgent:
         
         for service in ip_services:
             try:
-                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.0.8"}})
+                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.0.9"}})
                 response = urllib.request.urlopen(req, timeout=5)
                 ip = response.read().decode('utf-8').strip()
                 if ip and len(ip) < 50:  # Basic validation
