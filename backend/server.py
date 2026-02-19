@@ -1291,6 +1291,617 @@ async def get_cve_status(current_user: dict = Depends(get_current_user)):
         "is_syncing": stats["is_syncing"]
     }
 
+# ============== Agent Endpoints ==============
+@api_router.get("/agents", response_model=List[AgentResponse])
+async def list_agents(current_user: dict = Depends(get_current_user)):
+    """List agents for current user (customers see their agents, admins see all)"""
+    query = {}
+    if current_user["role"] == "customer":
+        query["customer_id"] = current_user["id"]
+    elif current_user["role"] == "reseller":
+        # Resellers see their own agents and their customers' agents
+        customer_ids = await db.users.distinct("id", {"parent_id": current_user["id"]})
+        query["customer_id"] = {"$in": [current_user["id"]] + customer_ids}
+    
+    agents = await db.agents.find(query, {"_id": 0, "token": 0}).to_list(100)
+    
+    # Check real-time connection status
+    gateway = get_agent_gateway(db)
+    for agent in agents:
+        if gateway.is_agent_online(agent["id"]):
+            agent["status"] = "online"
+    
+    return agents
+
+
+@api_router.post("/agents", response_model=AgentWithToken)
+async def create_agent(
+    agent_data: AgentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new agent for the customer"""
+    # Only customers and admins can create agents
+    if current_user["role"] == "reseller":
+        raise HTTPException(status_code=403, detail="Resellers cannot create agents directly")
+    
+    # Generate secure token
+    plain_token = generate_agent_token()
+    hashed_token = hash_token(plain_token)
+    
+    agent = Agent(
+        customer_id=current_user["id"],
+        name=agent_data.name,
+        token=hashed_token,
+        internal_networks=agent_data.internal_networks
+    )
+    
+    agent_dict = agent.model_dump()
+    agent_dict["created_at"] = agent_dict["created_at"].isoformat()
+    agent_dict["updated_at"] = agent_dict["updated_at"].isoformat()
+    
+    await db.agents.insert_one(agent_dict)
+    logger.info(f"Agent created: {agent.name} for user {current_user['id']}")
+    
+    # Generate install command
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
+    install_command = f'curl -sSL {base_url}/api/agent/install.sh | sudo bash -s {plain_token}'
+    
+    return AgentWithToken(
+        id=agent.id,
+        customer_id=agent.customer_id,
+        name=agent.name,
+        token=plain_token,  # Return plain token only once
+        status=agent.status,
+        internal_networks=agent.internal_networks,
+        is_active=agent.is_active,
+        created_at=agent.created_at,
+        install_command=install_command
+    )
+
+
+@api_router.get("/agents/{agent_id}", response_model=AgentResponse)
+async def get_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
+    """Get agent details"""
+    agent = await db.agents.find_one({"id": agent_id}, {"_id": 0, "token": 0})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Check permission
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Check real-time status
+    gateway = get_agent_gateway(db)
+    if gateway.is_agent_online(agent_id):
+        agent["status"] = "online"
+    
+    return agent
+
+
+@api_router.put("/agents/{agent_id}", response_model=AgentResponse)
+async def update_agent(
+    agent_id: str,
+    update_data: AgentUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update agent settings"""
+    agent = await db.agents.find_one({"id": agent_id}, {"_id": 0})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Check permission
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.agents.update_one({"id": agent_id}, {"$set": update_dict})
+    
+    updated_agent = await db.agents.find_one({"id": agent_id}, {"_id": 0, "token": 0})
+    return updated_agent
+
+
+@api_router.delete("/agents/{agent_id}")
+async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an agent"""
+    agent = await db.agents.find_one({"id": agent_id}, {"_id": 0})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Check permission
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    await db.agents.delete_one({"id": agent_id})
+    await db.agent_tasks.delete_many({"agent_id": agent_id})
+    
+    logger.info(f"Agent deleted: {agent_id}")
+    return {"message": "Agent deleted"}
+
+
+@api_router.post("/agents/{agent_id}/regenerate-token", response_model=AgentWithToken)
+async def regenerate_agent_token(agent_id: str, current_user: dict = Depends(get_current_user)):
+    """Regenerate agent token (invalidates old token)"""
+    agent = await db.agents.find_one({"id": agent_id}, {"_id": 0})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Check permission
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Generate new token
+    plain_token = generate_agent_token()
+    hashed_token = hash_token(plain_token)
+    
+    await db.agents.update_one(
+        {"id": agent_id},
+        {"$set": {
+            "token": hashed_token,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
+    install_command = f'curl -sSL {base_url}/api/agent/install.sh | sudo bash -s {plain_token}'
+    
+    return AgentWithToken(
+        id=agent["id"],
+        customer_id=agent["customer_id"],
+        name=agent["name"],
+        token=plain_token,
+        status=agent.get("status", "offline"),
+        internal_networks=agent.get("internal_networks", []),
+        is_active=agent.get("is_active", True),
+        created_at=agent["created_at"],
+        install_command=install_command
+    )
+
+
+@api_router.get("/agents/{agent_id}/tasks", response_model=List[AgentTaskResponse])
+async def list_agent_tasks(
+    agent_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get task history for an agent"""
+    agent = await db.agents.find_one({"id": agent_id}, {"_id": 0})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Check permission
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    tasks = await db.agent_tasks.find(
+        {"agent_id": agent_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return tasks
+
+
+@api_router.post("/agents/{agent_id}/send-command")
+async def send_agent_command(
+    agent_id: str,
+    command_type: str = Query(..., description="Command type: health_check, install_nmap, install_masscan"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Send a command to an agent"""
+    agent = await db.agents.find_one({"id": agent_id}, {"_id": 0})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Check permission
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    gateway = get_agent_gateway(db)
+    
+    if not gateway.is_agent_online(agent_id):
+        raise HTTPException(status_code=400, detail="Agent is offline")
+    
+    # Create and send task based on command type
+    commands = {
+        "health_check": ("health_check", "echo 'Agent is healthy'", {}),
+        "install_nmap": ("install_tool", "apt-get update && apt-get install -y nmap", {"tool": "nmap"}),
+        "install_masscan": ("install_tool", "apt-get update && apt-get install -y masscan", {"tool": "masscan"}),
+        "system_info": ("system_info", "uname -a && cat /etc/os-release", {}),
+    }
+    
+    if command_type not in commands:
+        raise HTTPException(status_code=400, detail=f"Invalid command type. Valid: {list(commands.keys())}")
+    
+    task_type, command, params = commands[command_type]
+    task = await gateway.create_task(agent_id, task_type, command, params)
+    
+    return {"message": f"Command '{command_type}' sent to agent", "task_id": task["id"]}
+
+
+# ============== Agent WebSocket ==============
+@app.websocket("/ws/agent")
+async def agent_websocket(websocket: WebSocket, token: str = Query(...)):
+    """WebSocket endpoint for agent connections"""
+    gateway = get_agent_gateway(db)
+    await gateway.handle_connection(websocket, token)
+
+
+# ============== Agent Install Script ==============
+@api_router.get("/agent/install.sh")
+async def get_agent_install_script():
+    """Get the agent installation script"""
+    base_url = os.environ.get("REACT_APP_BACKEND_URL", "https://your-panel.com")
+    
+    script = f'''#!/bin/bash
+# SecureScan Agent Installer
+# Usage: curl -sSL {base_url}/api/agent/install.sh | sudo bash -s YOUR_TOKEN
+
+set -e
+
+AGENT_TOKEN="${{1:-}}"
+INSTALL_DIR="/opt/securescan-agent"
+CONFIG_FILE="$INSTALL_DIR/config.json"
+SERVICE_NAME="securescan-agent"
+PANEL_URL="{base_url}"
+
+# Colors
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+NC='\\033[0m' # No Color
+
+log_info() {{ echo -e "${{GREEN}}[INFO]${{NC}} $1"; }}
+log_warn() {{ echo -e "${{YELLOW}}[WARN]${{NC}} $1"; }}
+log_error() {{ echo -e "${{RED}}[ERROR]${{NC}} $1"; }}
+
+# Check root
+if [ "$EUID" -ne 0 ]; then
+    log_error "Please run as root (sudo)"
+    exit 1
+fi
+
+# Check token
+if [ -z "$AGENT_TOKEN" ]; then
+    log_error "Agent token is required"
+    echo "Usage: curl -sSL {base_url}/api/agent/install.sh | sudo bash -s YOUR_TOKEN"
+    exit 1
+fi
+
+log_info "Starting SecureScan Agent installation..."
+
+# Install dependencies
+log_info "Installing dependencies..."
+apt-get update -qq
+apt-get install -y -qq python3 python3-pip python3-venv curl nmap > /dev/null
+
+# Create installation directory
+log_info "Creating installation directory..."
+mkdir -p $INSTALL_DIR
+cd $INSTALL_DIR
+
+# Create virtual environment
+log_info "Setting up Python environment..."
+python3 -m venv venv
+source venv/bin/activate
+pip install -q websockets aiohttp
+
+# Create agent script
+log_info "Installing agent..."
+cat > $INSTALL_DIR/agent.py << 'AGENT_SCRIPT'
+"""SecureScan Remote Agent"""
+import asyncio
+import json
+import subprocess
+import platform
+import os
+import socket
+import logging
+from pathlib import Path
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("SecureScan-Agent")
+
+CONFIG_FILE = Path("/opt/securescan-agent/config.json")
+
+class SecureScanAgent:
+    def __init__(self, token: str, panel_url: str):
+        self.token = token
+        self.panel_url = panel_url.replace("https://", "wss://").replace("http://", "ws://")
+        self.ws = None
+        self.running = True
+    
+    def get_system_info(self):
+        """Collect system information"""
+        try:
+            os_info = f"{{platform.system()}} {{platform.release()}}"
+            
+            # Check installed tools
+            tools = []
+            for tool in ["nmap", "masscan", "nikto", "sqlmap"]:
+                try:
+                    subprocess.run(["which", tool], capture_output=True, check=True)
+                    tools.append(tool)
+                except:
+                    pass
+            
+            # Detect internal networks
+            networks = []
+            try:
+                result = subprocess.run(
+                    ["ip", "-4", "route", "show", "scope", "link"],
+                    capture_output=True, text=True
+                )
+                for line in result.stdout.strip().split("\\n"):
+                    if line:
+                        network = line.split()[0]
+                        if network and "/" in network:
+                            networks.append(network)
+            except:
+                pass
+            
+            return {{
+                "os_info": os_info,
+                "installed_tools": tools,
+                "detected_networks": networks,
+                "agent_version": "1.0.0",
+                "hostname": socket.gethostname()
+            }}
+        except Exception as e:
+            logger.error(f"Error getting system info: {{e}}")
+            return {{}}
+    
+    async def execute_task(self, task: dict):
+        """Execute a task from the panel"""
+        task_id = task.get("task_id")
+        task_type = task.get("task_type")
+        command = task.get("command")
+        params = task.get("parameters", {{}})
+        
+        logger.info(f"Executing task {{task_id}}: {{task_type}}")
+        
+        # Notify task started
+        await self.send({{"type": "task_started", "task_id": task_id}})
+        
+        try:
+            if task_type == "port_scan":
+                result = await self.run_port_scan(command, params, task_id)
+            elif task_type == "install_tool":
+                result = await self.install_tool(command, params)
+            elif task_type == "health_check":
+                result = {{"status": "healthy", "message": "Agent is running"}}
+            elif task_type == "system_info":
+                result = self.get_system_info()
+            else:
+                result = await self.run_command(command)
+            
+            await self.send({{
+                "type": "task_completed",
+                "task_id": task_id,
+                "result": result
+            }})
+            logger.info(f"Task {{task_id}} completed")
+            
+        except Exception as e:
+            logger.error(f"Task {{task_id}} failed: {{e}}")
+            await self.send({{
+                "type": "task_failed",
+                "task_id": task_id,
+                "error": str(e)
+            }})
+    
+    async def run_command(self, command: str):
+        """Run a shell command and return output"""
+        process = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        return {{
+            "stdout": stdout.decode(),
+            "stderr": stderr.decode(),
+            "returncode": process.returncode
+        }}
+    
+    async def run_port_scan(self, command: str, params: dict, task_id: str):
+        """Run nmap scan with progress updates"""
+        target = params.get("target", "")
+        port_range = params.get("port_range", "1-1000")
+        scan_type = params.get("scan_type", "quick")
+        
+        # Build nmap command
+        if scan_type == "quick":
+            cmd = f"nmap -sV -T4 --top-ports 100 {{target}}"
+        elif scan_type == "stealth":
+            cmd = f"nmap -sS -sV -T2 -p {{port_range}} {{target}}"
+        else:
+            cmd = f"nmap -sV -sC -T4 -p {{port_range}} {{target}}"
+        
+        logger.info(f"Running: {{cmd}}")
+        
+        process = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        output = stdout.decode()
+        
+        # Parse nmap output
+        ports = self.parse_nmap_output(output)
+        vulnerabilities = self.check_port_vulnerabilities(ports, target)
+        
+        return {{
+            "ports": ports,
+            "vulnerabilities": vulnerabilities,
+            "raw_output": output
+        }}
+    
+    def parse_nmap_output(self, output: str):
+        """Parse nmap output to extract port info"""
+        import re
+        ports = []
+        port_pattern = r"(\\d+)/(tcp|udp)\\s+(\\w+)\\s+(\\S+)(?:\\s+(.+))?"
+        
+        for line in output.split("\\n"):
+            match = re.search(port_pattern, line)
+            if match:
+                ports.append({{
+                    "port": int(match.group(1)),
+                    "protocol": match.group(2),
+                    "state": match.group(3),
+                    "service": match.group(4),
+                    "version": match.group(5) if match.group(5) else ""
+                }})
+        return ports
+    
+    def check_port_vulnerabilities(self, ports: list, target: str):
+        """Check for known vulnerabilities based on open ports"""
+        vulnerabilities = []
+        dangerous_ports = {{
+            21: ("FTP Open", "high", "FTP transmits data in clear text"),
+            23: ("Telnet Open", "critical", "Telnet transmits all data in clear text"),
+            445: ("SMB Open", "high", "SMB has been target of many critical vulnerabilities"),
+            3389: ("RDP Open", "medium", "Remote Desktop Protocol is exposed"),
+        }}
+        
+        for port in ports:
+            if port["state"] == "open" and port["port"] in dangerous_ports:
+                title, severity, desc = dangerous_ports[port["port"]]
+                vulnerabilities.append({{
+                    "target_value": target,
+                    "severity": severity,
+                    "title": title,
+                    "description": desc,
+                    "port": port["port"],
+                    "service": port["service"]
+                }})
+        
+        return vulnerabilities
+    
+    async def install_tool(self, command: str, params: dict):
+        """Install a tool and report back"""
+        result = await self.run_command(command)
+        if result["returncode"] == 0:
+            tool_name = params.get("tool", "unknown")
+            await self.send({{"type": "tool_installed", "tool": tool_name}})
+        return result
+    
+    async def send(self, message: dict):
+        """Send message to panel"""
+        if self.ws:
+            await self.ws.send(json.dumps(message))
+    
+    async def connect(self):
+        """Connect to the panel WebSocket"""
+        import websockets
+        
+        ws_url = f"{{self.panel_url}}/ws/agent?token={{self.token}}"
+        logger.info(f"Connecting to {{ws_url}}")
+        
+        while self.running:
+            try:
+                async with websockets.connect(ws_url) as ws:
+                    self.ws = ws
+                    logger.info("Connected to SecureScan panel")
+                    
+                    # Send system info on connect
+                    sys_info = self.get_system_info()
+                    sys_info["type"] = "system_info"
+                    await self.send(sys_info)
+                    
+                    # Message loop
+                    async for message in ws:
+                        data = json.loads(message)
+                        msg_type = data.get("type")
+                        
+                        if msg_type == "ping":
+                            await self.send({{"type": "pong"}})
+                        elif msg_type == "execute_task":
+                            asyncio.create_task(self.execute_task(data))
+                        elif msg_type == "welcome":
+                            logger.info(f"Welcome: {{data.get('message')}}")
+                            
+            except Exception as e:
+                logger.error(f"Connection error: {{e}}")
+                logger.info("Reconnecting in 10 seconds...")
+                await asyncio.sleep(10)
+
+async def main():
+    if not CONFIG_FILE.exists():
+        logger.error("Config file not found")
+        return
+    
+    with open(CONFIG_FILE) as f:
+        config = json.load(f)
+    
+    agent = SecureScanAgent(config["token"], config["panel_url"])
+    await agent.connect()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+AGENT_SCRIPT
+
+# Create config file
+log_info "Creating configuration..."
+cat > $CONFIG_FILE << EOF
+{{
+    "token": "$AGENT_TOKEN",
+    "panel_url": "$PANEL_URL"
+}}
+EOF
+
+chmod 600 $CONFIG_FILE
+
+# Create systemd service
+log_info "Creating systemd service..."
+cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
+[Unit]
+Description=SecureScan Remote Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/agent.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+log_info "Starting agent service..."
+systemctl daemon-reload
+systemctl enable $SERVICE_NAME
+systemctl start $SERVICE_NAME
+
+log_info "======================================"
+log_info "SecureScan Agent installed successfully!"
+log_info "======================================"
+log_info "Installation directory: $INSTALL_DIR"
+log_info "Service name: $SERVICE_NAME"
+log_info ""
+log_info "Useful commands:"
+log_info "  Status:  systemctl status $SERVICE_NAME"
+log_info "  Logs:    journalctl -u $SERVICE_NAME -f"
+log_info "  Restart: systemctl restart $SERVICE_NAME"
+log_info "  Stop:    systemctl stop $SERVICE_NAME"
+'''
+    
+    return Response(content=script, media_type="text/plain")
+
+
 # ============== Translations ==============
 @api_router.get("/translations/{lang}")
 async def get_translations(lang: str):
