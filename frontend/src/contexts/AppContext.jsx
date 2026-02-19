@@ -281,6 +281,7 @@ const defaultTranslations = {
     dashboard: "Dashboard",
     targets: "Targets",
     scans: "Scans",
+    agents: "Agents",
     reports: "Reports",
     users: "Users",
     settings: "Settings",
