@@ -1711,11 +1711,44 @@ class SecureScanAgent:
                 "installed_tools": tools,
                 "detected_networks": networks,
                 "agent_version": "1.0.3",
-                "hostname": socket.gethostname()
+                "hostname": socket.gethostname(),
+                "ip_address": self.get_public_ip()
             }}
         except Exception as e:
             logger.error(f"Error getting system info: {{e}}")
             return {{}}
+    
+    def get_public_ip(self):
+        """Get the public IP address of this agent"""
+        import urllib.request
+        
+        # Try multiple services to get public IP
+        ip_services = [
+            "https://api.ipify.org",
+            "https://ifconfig.me/ip",
+            "https://icanhazip.com",
+            "https://ipecho.net/plain",
+        ]
+        
+        for service in ip_services:
+            try:
+                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                response = urllib.request.urlopen(req, timeout=5)
+                ip = response.read().decode('utf-8').strip()
+                if ip and len(ip) < 50:  # Basic validation
+                    return ip
+            except:
+                continue
+        
+        # Fallback to local IP if public IP detection fails
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            return local_ip
+        except:
+            return socket.gethostbyname(socket.gethostname())
     
     async def execute_task(self, task: dict):
         """Execute a task from the panel"""
