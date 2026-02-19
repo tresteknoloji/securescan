@@ -1774,16 +1774,20 @@ class SecureScanAgent:
             else:
                 result = await self.run_command(command)
             
-            await self.send({{
+            # Send task_completed with retry - this is critical
+            success = await self.send_with_retry({{
                 "type": "task_completed",
                 "task_id": task_id,
                 "result": result
             }})
-            logger.info(f"Task {{task_id}} completed")
+            if success:
+                logger.info(f"Task {{task_id}} completed and reported")
+            else:
+                logger.error(f"Task {{task_id}} completed but failed to report to panel")
             
         except Exception as e:
             logger.error(f"Task {{task_id}} failed: {{e}}")
-            await self.send({{
+            await self.send_with_retry({{
                 "type": "task_failed",
                 "task_id": task_id,
                 "error": str(e)
