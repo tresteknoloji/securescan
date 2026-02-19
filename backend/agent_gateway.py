@@ -109,7 +109,7 @@ class AgentGateway:
                     # No message received, check if connection is alive
                     try:
                         await websocket.send_json({"type": "ping"})
-                    except:
+                    except Exception:
                         break
                         
         except WebSocketDisconnect:
