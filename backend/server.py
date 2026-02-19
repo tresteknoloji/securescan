@@ -1937,14 +1937,15 @@ class SecureScanAgent:
                 ssl_findings = self.parse_ssl_findings(ssl_output, target)
                 all_ssl_findings.extend(ssl_findings)
             
-            # Phase 3: NSE Vulnerability Scripts
+            # Phase 3: NSE Vulnerability Scripts (limited set for speed)
             await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 25}})
             
-            # Run vulnerability scripts on open ports
-            port_str = ",".join(str(p) for p in open_ports[:20])  # Limit to 20 ports
-            nse_cmd = f"nmap -sV -p {{port_str}} --script=vuln,auth,default {{target}}"
+            # Run vulnerability scripts on open ports - use faster script set
+            # Avoid --script=vuln which runs too many slow scripts
+            port_str = ",".join(str(p) for p in open_ports[:15])  # Limit to 15 ports
+            nse_cmd = f"nmap -sV -p {{port_str}} --script=banner,http-title,ssh-hostkey,ssl-cert,ftp-anon,smb-vuln-ms17-010 -T4 {{target}}"
             
-            logger.info(f"Phase 3 - NSE Vuln Scan: {{nse_cmd}}")
+            logger.info(f"Phase 3 - NSE Scan: {{nse_cmd}}")
             
             try:
                 nse_stdout, nse_stderr = await self.run_command_with_heartbeat(nse_cmd, task_id, timeout=300)
