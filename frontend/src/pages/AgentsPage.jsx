@@ -173,11 +173,6 @@ export default function AgentsPage() {
     }
 
     try {
-      const networks = newAgent.internal_networks
-        .split(',')
-        .map(n => n.trim())
-        .filter(n => n);
-
       const res = await fetch(`${API_URL}/api/agents`, {
         method: 'POST',
         headers: {
@@ -186,7 +181,6 @@ export default function AgentsPage() {
         },
         body: JSON.stringify({
           name: newAgent.name,
-          internal_networks: networks,
         }),
       });
 
@@ -195,7 +189,7 @@ export default function AgentsPage() {
         setNewAgentToken(data);
         setShowCreateDialog(false);
         setShowTokenDialog(true);
-        setNewAgent({ name: '', internal_networks: '' });
+        setNewAgent({ name: '' });
         fetchAgents();
       } else {
         const error = await res.json();
