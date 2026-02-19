@@ -1829,12 +1829,6 @@ class SecureScanAgent:
             "vulnerabilities": all_vulnerabilities,
             "targets_scanned": targets
         }}
-        
-        return {{
-            "ports": ports,
-            "vulnerabilities": vulnerabilities,
-            "raw_output": output
-        }}
     
     def parse_nmap_output(self, output: str):
         """Parse nmap output to extract port info"""
