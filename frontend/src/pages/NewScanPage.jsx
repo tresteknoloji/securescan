@@ -48,11 +48,13 @@ const TYPE_ICONS = {
 export default function NewScanPage() {
   const navigate = useNavigate();
   const { api } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [targets, setTargets] = useState([]);
+  const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState([]);
+  const [selectedAgent, setSelectedAgent] = useState('');
   const [scanName, setScanName] = useState('');
   const [config, setConfig] = useState({
     scan_type: 'quick',
@@ -66,15 +68,25 @@ export default function NewScanPage() {
   });
 
   useEffect(() => {
-    fetchTargets();
+    fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchTargets = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get('/targets');
-      setTargets(response.data.filter(t => t.is_active !== false));
+      const [targetsRes, agentsRes] = await Promise.all([
+        api.get('/targets'),
+        api.get('/agents')
+      ]);
+      setTargets(targetsRes.data.filter(t => t.is_active !== false));
+      setAgents(agentsRes.data);
+      
+      // Auto-select first online agent if available
+      const onlineAgents = agentsRes.data.filter(a => a.status === 'online');
+      if (onlineAgents.length > 0) {
+        setSelectedAgent(onlineAgents[0].id);
+      }
     } catch (error) {
-      toast.error('Failed to load targets');
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
