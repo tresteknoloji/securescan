@@ -1710,7 +1710,7 @@ class SecureScanAgent:
                 "os_info": os_info,
                 "installed_tools": tools,
                 "detected_networks": networks,
-                "agent_version": "1.0.0",
+                "agent_version": "1.0.3",
                 "hostname": socket.gethostname()
             }}
         except Exception as e:

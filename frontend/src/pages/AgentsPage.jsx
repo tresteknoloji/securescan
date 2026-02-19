@@ -76,7 +76,7 @@ export default function AgentsPage() {
     offline: 'Çevrimdışı',
     busy: 'Meşgul',
     last_seen: 'Son Görülme',
-    tools: 'Araçlar',
+    created_at: 'Oluşturma Tarihi',
     actions: 'İşlemler',
     delete_agent: 'Agentı Sil',
     delete_confirm: 'Bu agentı silmek istediğinizden emin misiniz?',
@@ -326,7 +326,7 @@ export default function AgentsPage() {
                 <TableHead>{txt.agent_name}</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>{txt.os_info}</TableHead>
-                <TableHead>{txt.tools}</TableHead>
+                <TableHead>{txt.created_at}</TableHead>
                 <TableHead>{txt.last_seen}</TableHead>
                 <TableHead className="text-right">{txt.actions}</TableHead>
               </TableRow>
