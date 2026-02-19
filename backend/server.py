@@ -366,8 +366,22 @@ async def create_scan(
     data: ScanCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Create and start a new scan"""
+    """Create and start a new scan via agent"""
     user_id = current_user['sub']
+    
+    # Verify agent exists and belongs to user
+    agent = await db.agents.find_one({"id": data.agent_id, "is_active": True}, {"_id": 0})
+    if not agent:
+        raise HTTPException(status_code=400, detail="Invalid agent ID")
+    
+    # Check agent ownership
+    if current_user["role"] == "customer" and agent["customer_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Agent does not belong to you")
+    
+    # Check if agent is online
+    gateway = get_agent_gateway(db)
+    if not gateway.is_agent_online(data.agent_id):
+        raise HTTPException(status_code=400, detail="Agent is offline. Please ensure the agent is running.")
     
     # Check scan limit
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -384,6 +398,7 @@ async def create_scan(
         user_id=user_id,
         name=data.name,
         target_ids=data.target_ids,
+        agent_id=data.agent_id,
         config=data.config or ScanConfig()
     )
     
@@ -398,12 +413,32 @@ async def create_scan(
         {"$inc": {"scans_used_this_month": 1}}
     )
     
-    # Add iteration to config
-    config_dict = scan.config.model_dump()
-    config_dict["iteration"] = 1
+    # Update scan status to running
+    await db.scans.update_one(
+        {"id": scan.id},
+        {"$set": {"status": "running", "started_at": datetime.now(timezone.utc).isoformat()}}
+    )
     
-    # Start scan in a separate task (non-blocking)
-    asyncio.create_task(run_scan_wrapper(scan.id, targets, config_dict))
+    # Create task for agent
+    config = scan.config.model_dump()
+    target_values = [t["value"] for t in targets]
+    
+    task = await gateway.create_task(
+        agent_id=data.agent_id,
+        task_type="port_scan",
+        command="nmap_scan",  # Agent will interpret this
+        parameters={
+            "targets": target_values,
+            "target_details": targets,
+            "scan_type": config.get("scan_type", "quick"),
+            "port_range": config.get("port_range", "1-1000"),
+            "check_ssl": config.get("check_ssl", True),
+            "check_cve": config.get("check_cve", True),
+        },
+        scan_id=scan.id
+    )
+    
+    logger.info(f"Scan {scan.id} started via agent {data.agent_id}, task: {task['id']}")
     
     return ScanResponse(**scan.model_dump())
 
