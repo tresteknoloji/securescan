@@ -342,70 +342,281 @@ class AgentGateway:
         return task_dict
     
     async def process_scan_results(self, scan_id: str, result: dict):
-        """Process scan results received from agent"""
-        # This will be called when agent completes a scan task
-        # Results include ports, services, vulnerabilities found
-        
+        """
+        Process scan results received from agent.
+        Performs CVE matching, KEV checking, and vulnerability assessment
+        just like the local scanner does.
+        """
         logger.info(f"Processing scan results for {scan_id}")
-        
-        # The result contains raw nmap/scanner output
-        # We need to process it like the local scanner does
         
         # Get scan info
         scan = await self.db.scans.find_one({"id": scan_id})
         if not scan:
+            logger.error(f"Scan {scan_id} not found")
             return
         
-        # Import vulnerability processing logic
-        # This will be similar to what scanner.py does
-        vulnerabilities = result.get("vulnerabilities", [])
-        ports_count = len(result.get("ports", []))
+        iteration = scan.get("current_iteration", 1)
+        ports = result.get("ports", [])
+        targets_scanned = result.get("targets_scanned", [])
         
-        logger.info(f"Processing {len(vulnerabilities)} vulnerabilities and {ports_count} ports for scan {scan_id}")
+        logger.info(f"Processing {len(ports)} ports from {len(targets_scanned)} targets")
         
-        # Save vulnerabilities
-        for vuln_data in vulnerabilities:
-            from models import Vulnerability
-            vuln = Vulnerability(
-                scan_id=scan_id,
-                iteration=scan.get("current_iteration", 1),
-                target_id=vuln_data.get("target_id", ""),
-                target_value=vuln_data.get("target_value", ""),
-                severity=vuln_data.get("severity", "info"),
-                title=vuln_data.get("title", "Unknown"),
-                description=vuln_data.get("description", ""),
-                port=vuln_data.get("port"),
-                service=vuln_data.get("service"),
-                cve_id=vuln_data.get("cve_id"),
-                cvss_score=vuln_data.get("cvss_score")
+        # Get target details for mapping
+        target_ids = scan.get("target_ids", [])
+        targets = await self.db.targets.find({"id": {"$in": target_ids}}, {"_id": 0}).to_list(100)
+        target_map = {t["value"]: t for t in targets}
+        
+        all_vulnerabilities = []
+        open_ports_by_target = {}
+        
+        # Process each port finding
+        for port_info in ports:
+            target_value = port_info.get("target", "")
+            target_data = target_map.get(target_value, {})
+            target_id = target_data.get("id", "")
+            
+            # Track open ports
+            if port_info.get("state") == "open":
+                if target_value not in open_ports_by_target:
+                    open_ports_by_target[target_value] = []
+                open_ports_by_target[target_value].append({
+                    "port": port_info.get("port"),
+                    "protocol": port_info.get("protocol", "tcp"),
+                    "service": port_info.get("service", ""),
+                    "version": port_info.get("version", "")
+                })
+            
+            # Get vulnerabilities for this port/service
+            port_vulns = await self._process_port_vulnerabilities(
+                port_info, target_id, target_value, iteration, scan_id
             )
-            vuln_dict = vuln.model_dump()
+            all_vulnerabilities.extend(port_vulns)
+        
+        # Save all vulnerabilities to database
+        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        
+        for vuln in all_vulnerabilities:
+            from models import Vulnerability
+            vuln_obj = Vulnerability(
+                scan_id=scan_id,
+                iteration=iteration,
+                target_id=vuln.get("target_id", ""),
+                target_value=vuln.get("target_value", ""),
+                severity=vuln.get("severity", "info"),
+                title=vuln.get("title", "Unknown"),
+                description=vuln.get("description", ""),
+                port=vuln.get("port"),
+                service=vuln.get("service"),
+                cve_id=vuln.get("cve_id"),
+                cvss_score=vuln.get("cvss_score"),
+                references=vuln.get("references", []),
+                is_kev=vuln.get("is_kev", False),
+                evidence=vuln.get("evidence", "")
+            )
+            vuln_dict = vuln_obj.model_dump()
             vuln_dict["created_at"] = vuln_dict["created_at"].isoformat()
             await self.db.vulnerabilities.insert_one(vuln_dict)
-        
-        # Update scan summary
-        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
-        for v in vulnerabilities:
-            sev = v.get("severity", "info").lower()
+            
+            sev = vuln.get("severity", "info").lower()
             if sev in severity_counts:
                 severity_counts[sev] += 1
         
+        # Update scan with results
         await self.db.scans.update_one(
             {"id": scan_id},
             {"$set": {
                 "status": "completed",
                 "progress": 100,
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-                "total_vulnerabilities": len(vulnerabilities),
+                "total_vulnerabilities": len(all_vulnerabilities),
                 "critical_count": severity_counts["critical"],
                 "high_count": severity_counts["high"],
                 "medium_count": severity_counts["medium"],
                 "low_count": severity_counts["low"],
-                "info_count": severity_counts["info"]
+                "info_count": severity_counts["info"],
+                "open_ports_by_target": open_ports_by_target
             }}
         )
         
-        logger.info(f"Scan {scan_id} completed with {len(vulnerabilities)} vulnerabilities")
+        logger.info(f"Scan {scan_id} completed with {len(all_vulnerabilities)} vulnerabilities")
+    
+    async def _process_port_vulnerabilities(
+        self, port_info: dict, target_id: str, target_value: str, iteration: int, scan_id: str
+    ) -> list:
+        """
+        Process vulnerabilities for a single port.
+        Checks CVE database and KEV for matches.
+        """
+        vulnerabilities = []
+        
+        port = port_info.get("port")
+        state = port_info.get("state", "")
+        service = port_info.get("service", "").lower()
+        version = port_info.get("version", "")
+        protocol = port_info.get("protocol", "tcp")
+        
+        if state != "open":
+            return vulnerabilities
+        
+        # 1. Check for dangerous/risky ports
+        dangerous_ports = {
+            21: ("FTP Service Exposed", "high", "FTP transmits credentials in clear text. Consider SFTP."),
+            22: ("SSH Service Exposed", "info", "SSH accessible. Ensure strong authentication."),
+            23: ("Telnet Service Exposed", "critical", "Telnet transmits all data in clear text. Disable immediately."),
+            25: ("SMTP Service Exposed", "medium", "Mail server exposed. Verify not an open relay."),
+            53: ("DNS Service Exposed", "low", "DNS accessible. Check for zone transfer."),
+            80: ("HTTP Service Exposed", "info", "Web server on HTTP. Consider HTTPS."),
+            110: ("POP3 Service Exposed", "medium", "POP3 unencrypted. Use POP3S."),
+            111: ("RPC Service Exposed", "medium", "RPC portmapper exposed."),
+            135: ("MSRPC Exposed", "medium", "Microsoft RPC exposed."),
+            139: ("NetBIOS Exposed", "high", "NetBIOS can leak system info."),
+            143: ("IMAP Service Exposed", "medium", "IMAP unencrypted. Use IMAPS."),
+            445: ("SMB Service Exposed", "high", "SMB exposed. Target of critical exploits."),
+            1433: ("MSSQL Exposed", "high", "SQL Server exposed to network."),
+            1521: ("Oracle DB Exposed", "high", "Oracle listener exposed."),
+            3306: ("MySQL Exposed", "high", "MySQL exposed to network."),
+            3389: ("RDP Service Exposed", "high", "Remote Desktop exposed. BlueKeep risk."),
+            5432: ("PostgreSQL Exposed", "high", "PostgreSQL exposed."),
+            5900: ("VNC Exposed", "high", "VNC often has weak auth."),
+            6379: ("Redis Exposed", "critical", "Redis often without auth."),
+            8080: ("HTTP Alt Exposed", "low", "Alternative HTTP port."),
+            27017: ("MongoDB Exposed", "critical", "MongoDB often without auth."),
+        }
+        
+        if port in dangerous_ports:
+            title, severity, desc = dangerous_ports[port]
+            vulnerabilities.append({
+                "target_id": target_id,
+                "target_value": target_value,
+                "severity": severity,
+                "title": title,
+                "description": desc,
+                "port": port,
+                "service": service,
+                "evidence": f"Port {port}/{protocol} open - {service} {version}".strip()
+            })
+        
+        # 2. CVE lookup based on service and version
+        if version and service:
+            cve_vulns = await self._lookup_cve_for_service(
+                service, version, port, target_id, target_value
+            )
+            vulnerabilities.extend(cve_vulns)
+        
+        return vulnerabilities
+    
+    async def _lookup_cve_for_service(
+        self, service: str, version: str, port: int, target_id: str, target_value: str
+    ) -> list:
+        """
+        Look up CVEs in local database for a service/version combination.
+        Also checks CISA KEV status.
+        """
+        vulnerabilities = []
+        
+        # Build search terms
+        search_terms = []
+        service_lower = service.lower()
+        version_lower = version.lower()
+        
+        # Extract product and version info
+        # Common patterns: "OpenSSH 8.9p1", "Apache httpd 2.4.52", "nginx 1.18.0"
+        import re
+        
+        # Try to extract product name and version
+        product_patterns = [
+            r'(openssh)[_\s]*([\d.p]+)',
+            r'(apache)[/\s]*([\d.]+)',
+            r'(nginx)[/\s]*([\d.]+)',
+            r'(mysql)[/\s]*([\d.]+)',
+            r'(postgresql)[/\s]*([\d.]+)',
+            r'(microsoft-ds|smb)',
+            r'(proftpd)[/\s]*([\d.]+)',
+            r'(vsftpd)[/\s]*([\d.]+)',
+            r'(exim)[/\s]*([\d.]+)',
+            r'(postfix)',
+            r'(iis)[/\s]*([\d.]+)',
+        ]
+        
+        for pattern in product_patterns:
+            match = re.search(pattern, version_lower)
+            if match:
+                product = match.group(1)
+                ver = match.group(2) if len(match.groups()) > 1 else ""
+                search_terms.append(product)
+                if ver:
+                    search_terms.append(f"{product} {ver}")
+                break
+        
+        # Also use service name
+        if service_lower and service_lower not in search_terms:
+            search_terms.append(service_lower)
+        
+        if not search_terms:
+            return vulnerabilities
+        
+        # Search CVE database
+        for term in search_terms[:3]:  # Limit searches
+            try:
+                # Search in CVE descriptions
+                cve_query = {
+                    "$or": [
+                        {"description": {"$regex": term, "$options": "i"}},
+                        {"cve_id": {"$regex": term, "$options": "i"}}
+                    ]
+                }
+                
+                # Get matching CVEs (limit to avoid too many)
+                cves = await self.db.cves.find(
+                    cve_query, 
+                    {"_id": 0, "cve_id": 1, "description": 1, "cvss_score": 1, "severity": 1, "is_kev": 1, "references": 1}
+                ).limit(10).to_list(10)
+                
+                for cve in cves:
+                    # Skip if already added
+                    if any(v.get("cve_id") == cve["cve_id"] for v in vulnerabilities):
+                        continue
+                    
+                    cvss = cve.get("cvss_score", 0)
+                    severity = cve.get("severity", "medium")
+                    if not severity:
+                        if cvss >= 9.0:
+                            severity = "critical"
+                        elif cvss >= 7.0:
+                            severity = "high"
+                        elif cvss >= 4.0:
+                            severity = "medium"
+                        else:
+                            severity = "low"
+                    
+                    # Get references
+                    refs = cve.get("references", [])
+                    ref_urls = []
+                    for ref in refs[:3]:
+                        if isinstance(ref, dict):
+                            ref_urls.append(ref.get("url", ""))
+                        elif isinstance(ref, str):
+                            ref_urls.append(ref)
+                    
+                    vulnerabilities.append({
+                        "target_id": target_id,
+                        "target_value": target_value,
+                        "severity": severity,
+                        "title": f"{cve['cve_id']} - {service}",
+                        "description": cve.get("description", "")[:500],
+                        "port": port,
+                        "service": service,
+                        "cve_id": cve["cve_id"],
+                        "cvss_score": cvss,
+                        "is_kev": cve.get("is_kev", False),
+                        "references": ref_urls,
+                        "evidence": f"Service: {service} Version: {version}"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"CVE lookup error for {term}: {e}")
+        
+        return vulnerabilities
     
     def is_agent_online(self, agent_id: str) -> bool:
         """Check if agent is currently connected"""
