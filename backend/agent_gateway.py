@@ -982,46 +982,6 @@ class AgentGateway:
         
         logger.info(f"Found {len(vulnerabilities)} applicable CVEs for {product} {version}")
         return vulnerabilities
-            if not severity:
-                if cvss >= 9.0:
-                    severity = "critical"
-                elif cvss >= 7.0:
-                    severity = "high"
-                elif cvss >= 4.0:
-                    severity = "medium"
-                else:
-                    severity = "low"
-            
-            # Get references
-            refs = cve.get("references", [])
-            ref_urls = []
-            for ref in refs[:3]:
-                if isinstance(ref, dict):
-                    ref_urls.append(ref.get("url", ""))
-                elif isinstance(ref, str):
-                    ref_urls.append(ref)
-            
-            vulnerabilities.append({
-                "target_id": target_id,
-                "target_value": target_value,
-                "severity": severity,
-                "title": f"{cve_id} - {product.upper()}",
-                "description": cve.get("description", "")[:500],
-                "port": port,
-                "service": service,
-                "cve_id": cve_id,
-                "cvss_score": cvss,
-                "is_kev": cve.get("is_kev", False),
-                "references": ref_urls,
-                "evidence": f"Service: {service} Version: {full_version} | Affected: {', '.join(affected)}"
-            })
-            
-            # Limit to 10 CVEs per service to avoid report bloat
-            if len(vulnerabilities) >= 10:
-                break
-        
-        logger.info(f"Found {len(vulnerabilities)} applicable CVEs for {product} {version}")
-        return vulnerabilities
     
     def _is_relevant_cve(self, product: str, description: str) -> bool:
         """
