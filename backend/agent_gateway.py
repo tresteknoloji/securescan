@@ -508,7 +508,9 @@ class AgentGateway:
                 cvss_score=vuln.get("cvss_score"),
                 references=vuln.get("references", []),
                 is_kev=vuln.get("is_kev", False),
-                evidence=vuln.get("evidence", "")
+                evidence=vuln.get("evidence", ""),
+                confidence=vuln.get("confidence"),
+                has_exploit_ref=vuln.get("has_exploit_ref", False)
             )
             vuln_dict = vuln_obj.model_dump()
             vuln_dict["created_at"] = vuln_dict["created_at"].isoformat()
