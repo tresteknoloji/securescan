@@ -293,6 +293,14 @@ CVE eşleştirmesi artık doğru versiyon aralığı kontrolü yapıyor:
   - Agentlar sayfasında "Araçlar" yerine "Oluşturma Tarihi" gösterimi
   - Tarama detay sayfasında Başlangıç/Bitiş/Süre bilgileri
   - Raporlarda Başlangıç/Bitiş/Süre bilgileri
+- [x] **Zafiyet Motoru False Positive Düzeltmeleri - ✅ Tamamlandı (2026-02-19)**
+  - SQLi tespiti: Reflected parameter değil, SQL error pattern matching kullanılıyor
+  - Boolean-based ve error-based SQLi doğrulama
+  - Confidence scoring sistemi: confirmed / likely / possible / unlikely / informational
+  - Distro-aware CVE matching: Ubuntu/Debian backport patch tespiti
+  - NSE script ERROR çıktıları filtreleniyor (zafiyet olarak raporlanmıyor)
+  - Exploit referansları informational olarak işaretleniyor (severity yükseltmiyor)
+  - CVE yaşına göre distro patched sistemlerde downgrade
 - [ ] Reseller olarak müşteri hesabına giriş ("Login as Customer")
 
 ### P1 (Yüksek)
