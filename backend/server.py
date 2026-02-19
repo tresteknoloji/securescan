@@ -1810,7 +1810,7 @@ class SecureScanAgent:
     async def run_command_with_heartbeat(self, cmd: str, task_id: str, timeout: int = 300):
         """
         Run a long-running command while sending heartbeats to keep WebSocket alive.
-        Sends heartbeat every 30 seconds during command execution.
+        Sends heartbeat every 20 seconds during command execution.
         """
         process = await asyncio.create_subprocess_shell(
             cmd,
@@ -1818,14 +1818,15 @@ class SecureScanAgent:
             stderr=asyncio.subprocess.PIPE
         )
         
-        # Create heartbeat task
+        # Create heartbeat task - send every 20 seconds to keep Nginx/proxy happy
         async def send_heartbeats():
             while True:
-                await asyncio.sleep(30)
+                await asyncio.sleep(20)
                 try:
                     await self.send({{"type": "heartbeat", "task_id": task_id}})
-                    logger.debug(f"Heartbeat sent for task {{task_id}}")
-                except:
+                    logger.info(f"Heartbeat sent for task {{task_id}}")
+                except Exception as e:
+                    logger.warning(f"Heartbeat failed: {{e}}")
                     break
         
         heartbeat_task = asyncio.create_task(send_heartbeats())
