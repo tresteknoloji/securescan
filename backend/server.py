@@ -1368,7 +1368,7 @@ async def get_agent(agent_id: str, current_user: dict = Depends(get_current_user
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Check permission
-    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Check real-time status
@@ -1392,7 +1392,7 @@ async def update_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Check permission
-    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
@@ -1413,7 +1413,7 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Check permission
-    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     await db.agents.delete_one({"id": agent_id})
@@ -1432,7 +1432,7 @@ async def regenerate_agent_token(agent_id: str, current_user: dict = Depends(get
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Check permission
-    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Generate new token
@@ -1476,7 +1476,7 @@ async def list_agent_tasks(
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Check permission
-    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     tasks = await db.agent_tasks.find(
@@ -1500,7 +1500,7 @@ async def send_agent_command(
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Check permission
-    if current_user["role"] == "customer" and agent["customer_id"] != current_user["id"]:
+    if current_user["role"] == "customer" and agent["customer_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     gateway = get_agent_gateway(db)
