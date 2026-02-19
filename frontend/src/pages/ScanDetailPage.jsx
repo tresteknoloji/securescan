@@ -490,8 +490,33 @@ export default function ScanDetailPage() {
                               CPE Match
                             </Badge>
                           )}
+                          {vuln.source === 'ssl_scan' && (
+                            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+                              <Lock className="mr-1 h-3 w-3" />
+                              SSL/TLS
+                            </Badge>
+                          )}
+                          {vuln.source === 'nse_scan' && (
+                            <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/50">
+                              <Code className="mr-1 h-3 w-3" />
+                              NSE Script
+                            </Badge>
+                          )}
+                          {vuln.source === 'web_scan' && (
+                            <Badge className="bg-pink-500/20 text-pink-400 border-pink-500/50">
+                              <Globe className="mr-1 h-3 w-3" />
+                              Web Check
+                            </Badge>
+                          )}
                           <span className="text-muted-foreground mono">Target: {vuln.target_value}</span>
                         </div>
+                        {vuln.evidence && (
+                          <div className="mt-2 p-2 rounded bg-muted/30 text-xs font-mono text-muted-foreground">
+                            <span className="text-primary mr-2">Evidence:</span>
+                            {vuln.evidence.substring(0, 200)}
+                            {vuln.evidence.length > 200 && '...'}
+                          </div>
+                        )}
                         {vuln.references && vuln.references.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {vuln.references.slice(0, 3).map((ref, idx) => (
