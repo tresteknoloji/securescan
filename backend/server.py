@@ -2498,20 +2498,29 @@ class SecureScanAgent:
         return result
     
     async def send(self, message: dict):
-        """Send message to panel"""
-        if self.ws:
-            await self.ws.send(json.dumps(message))
+        """Send message to panel with connection check"""
+        try:
+            if self.ws and not self.ws.closed:
+                await self.ws.send(json.dumps(message))
+                return True
+            else:
+                logger.warning("WebSocket is closed, cannot send")
+                return False
+        except Exception as e:
+            logger.error(f"Send error: {{e}}")
+            return False
     
     async def send_with_retry(self, message: dict, max_retries: int = 3):
         """Send a message with retry logic for critical messages like task_completed"""
         for attempt in range(max_retries):
             try:
-                if self.ws and self.ws.open:
+                if self.ws and not self.ws.closed:
                     await self.ws.send(json.dumps(message))
                     return True
                 else:
-                    logger.warning(f"WebSocket not connected, attempt {{attempt + 1}}/{{max_retries}}")
-                    await asyncio.sleep(2)
+                    logger.warning(f"WebSocket closed, attempt {{attempt + 1}}/{{max_retries}}")
+                    # Wait for reconnection
+                    await asyncio.sleep(5)
             except Exception as e:
                 logger.error(f"Send failed (attempt {{attempt + 1}}): {{e}}")
                 await asyncio.sleep(2)
