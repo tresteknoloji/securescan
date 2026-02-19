@@ -420,8 +420,8 @@ export default function AgentsPage() {
             <DialogTitle>{txt.add_agent}</DialogTitle>
             <DialogDescription>
               {language === 'tr'
-                ? 'Dahili ağlarınızı taramak için yeni bir agent ekleyin'
-                : 'Add a new agent to scan your internal networks'}
+                ? 'Uzak sunucunuzda tarama yapmak için yeni bir agent ekleyin'
+                : 'Add a new agent to scan from your remote server'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
