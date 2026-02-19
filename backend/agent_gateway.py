@@ -818,16 +818,26 @@ class AgentGateway:
     
     async def _cpe_based_cve_lookup(
         self, product: str, version: str, port: int, 
-        target_id: str, target_value: str, service: str, full_version: str
+        target_id: str, target_value: str, service: str, full_version: str,
+        distro_info: dict = None
     ) -> list:
         """
-        Smart CVE lookup with version range validation.
-        Only returns CVEs that actually affect the detected version.
+        Smart CVE lookup with version range validation and distro awareness.
+        - Only returns CVEs that actually affect the detected version
+        - Accounts for distro backport patches (Ubuntu, Debian, RHEL)
+        - Implements confidence scoring
+        - Does NOT boost severity based on exploit availability
         """
         vulnerabilities = []
         detected_ver_tuple = self._parse_version(version)
         
-        logger.info(f"Checking CVEs for {product} {version} (parsed: {detected_ver_tuple})")
+        if distro_info is None:
+            distro_info = {}
+        
+        is_distro_patched = distro_info.get("is_patched", False)
+        distro_name = distro_info.get("distro", "")
+        
+        logger.info(f"Checking CVEs for {product} {version} (parsed: {detected_ver_tuple}, distro: {distro_name}, patched: {is_distro_patched})")
         
         # Build query - search for product in description but we'll validate version
         cve_query = {
@@ -839,20 +849,21 @@ class AgentGateway:
             cves = await self.db.cves.find(
                 cve_query,
                 {"_id": 0, "cve_id": 1, "description": 1, "cvss_score": 1, 
-                 "severity": 1, "is_kev": 1, "references": 1, "affected_versions": 1}
+                 "severity": 1, "is_kev": 1, "references": 1, "affected_versions": 1,
+                 "published_date": 1}
             ).limit(100).to_list(100)
         except Exception as e:
             logger.error(f"CVE database query error: {e}")
             return vulnerabilities
         
         import re
+        from datetime import datetime
         
         for cve in cves:
             cve_id = cve.get("cve_id", "")
             description = cve.get("description", "").lower()
             
             # Skip if this CVE is for a different product with similar name
-            # e.g., skip "OpenSSH-client" CVEs when checking "OpenSSH" server
             if not self._is_relevant_cve(product, description):
                 continue
             
@@ -875,9 +886,102 @@ class AgentGateway:
                 logger.debug(f"Skipping {cve_id}: {product} {version} not in affected range {affected}")
                 continue
             
-            # This CVE actually affects our version
+            # === DISTRO PATCH AWARENESS ===
+            # If this is a distro-patched version, we need to be conservative
+            confidence = "confirmed"
+            severity_note = ""
+            
+            if is_distro_patched:
+                # Distro backports security patches without changing version
+                # We cannot be certain this CVE affects this specific build
+                
+                # Get CVE publish date if available
+                pub_date = cve.get("published_date", "")
+                
+                # For distro-patched systems, downgrade confidence
+                confidence = "possible"
+                severity_note = f" (Distro: {distro_name} - may be patched)"
+                
+                # Very old CVEs on modern distro builds are likely patched
+                if pub_date:
+                    try:
+                        cve_year = int(cve_id.split("-")[1]) if "-" in cve_id else 0
+                        current_year = datetime.now().year
+                        
+                        if current_year - cve_year >= 3:
+                            # CVE is 3+ years old on a patched distro
+                            # Very likely already patched via backport
+                            confidence = "unlikely"
+                            severity_note = f" (CVE from {cve_year}, likely patched on {distro_name})"
+                    except:
+                        pass
+            
+            # Get base severity from CVSS
             cvss = cve.get("cvss_score", 0)
             severity = cve.get("severity", "medium")
+            if not severity:
+                if cvss >= 9.0:
+                    severity = "critical"
+                elif cvss >= 7.0:
+                    severity = "high"
+                elif cvss >= 4.0:
+                    severity = "medium"
+                else:
+                    severity = "low"
+            
+            # === DO NOT BOOST SEVERITY BASED ON EXPLOIT REFS ===
+            # Exploit availability does NOT mean the system is exploitable
+            # KEV status is informational, not automatic severity boost
+            
+            # Get references (but don't use them for severity)
+            refs = cve.get("references", [])
+            ref_urls = []
+            has_exploit_ref = False
+            for ref in refs[:5]:
+                if isinstance(ref, dict):
+                    url = ref.get("url", "")
+                elif isinstance(ref, str):
+                    url = ref
+                else:
+                    continue
+                
+                ref_urls.append(url)
+                
+                # Track if exploit refs exist (informational only)
+                if any(x in url.lower() for x in ["exploit-db", "packetstorm", "github.com", "metasploit"]):
+                    has_exploit_ref = True
+            
+            # Build title with confidence
+            if confidence == "confirmed":
+                title_suffix = ""
+            elif confidence == "possible":
+                title_suffix = " - POSSIBLE"
+            else:
+                title_suffix = " - UNLIKELY (Distro Patched)"
+            
+            vulnerabilities.append({
+                "target_id": target_id,
+                "target_value": target_value,
+                "severity": severity if confidence == "confirmed" else "info",  # Downgrade if not confirmed
+                "confidence": confidence,
+                "title": f"{cve_id} - {product.upper()}{title_suffix}",
+                "description": cve.get("description", "")[:500] + severity_note,
+                "port": port,
+                "service": service,
+                "cve_id": cve_id,
+                "cvss_score": cvss,
+                "is_kev": cve.get("is_kev", False),
+                "has_exploit_ref": has_exploit_ref,  # Informational only
+                "references": ref_urls[:3],
+                "evidence": f"Service: {service} Version: {full_version} | Affected: {', '.join(affected)}"
+            })
+            
+            # Limit to 10 CVEs per service to avoid report bloat
+            if len(vulnerabilities) >= 10:
+                break
+        
+        logger.info(f"Found {len(vulnerabilities)} applicable CVEs for {product} {version}")
+        return vulnerabilities
             if not severity:
                 if cvss >= 9.0:
                     severity = "critical"
