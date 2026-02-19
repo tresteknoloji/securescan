@@ -444,3 +444,96 @@ TRANSLATIONS = {
         "live_results": "Live Results",
     }
 }
+
+
+
+# ============== Agent Models ==============
+AgentStatusType = Literal["online", "offline", "busy"]
+
+class Agent(BaseModel):
+    """Remote scanning agent for internal network scanning"""
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=generate_uuid)
+    customer_id: str  # Owner of the agent
+    name: str  # "Office Network", "AWS VPC", etc.
+    token: str  # Unique auth token (stored hashed)
+    status: AgentStatusType = "offline"
+    last_seen: Optional[datetime] = None
+    ip_address: Optional[str] = None  # Agent's public IP
+    internal_networks: List[str] = Field(default_factory=list)  # Networks agent can scan
+    installed_tools: List[str] = Field(default_factory=list)  # ["nmap", "masscan"]
+    os_info: Optional[str] = None  # "Ubuntu 22.04"
+    agent_version: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+class AgentCreate(BaseModel):
+    name: str
+    internal_networks: List[str] = Field(default_factory=list)
+
+class AgentUpdate(BaseModel):
+    name: Optional[str] = None
+    internal_networks: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+class AgentResponse(BaseModel):
+    id: str
+    customer_id: str
+    name: str
+    status: AgentStatusType
+    last_seen: Optional[datetime] = None
+    ip_address: Optional[str] = None
+    internal_networks: List[str] = []
+    installed_tools: List[str] = []
+    os_info: Optional[str] = None
+    agent_version: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+class AgentWithToken(BaseModel):
+    """Response when creating new agent - includes plain token (only shown once)"""
+    id: str
+    customer_id: str
+    name: str
+    token: str  # Plain token - only returned on creation
+    status: AgentStatusType
+    internal_networks: List[str] = []
+    is_active: bool
+    created_at: datetime
+    install_command: str  # Ready-to-use installation command
+
+# Agent Task - Commands sent to agent
+AgentTaskStatusType = Literal["pending", "sent", "running", "completed", "failed", "timeout"]
+
+class AgentTask(BaseModel):
+    """Task/command to be executed by agent"""
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=generate_uuid)
+    agent_id: str
+    scan_id: Optional[str] = None  # Related scan if any
+    task_type: str  # "port_scan", "service_detect", "install_tool", "health_check"
+    command: str  # Actual command to run
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    status: AgentTaskStatusType = "pending"
+    progress: int = 0
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+class AgentTaskResponse(BaseModel):
+    id: str
+    agent_id: str
+    scan_id: Optional[str] = None
+    task_type: str
+    status: AgentTaskStatusType
+    progress: int
+    result: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
