@@ -1454,7 +1454,6 @@ async def regenerate_agent_token(agent_id: str, current_user: dict = Depends(get
         name=agent["name"],
         token=plain_token,
         status=agent.get("status", "offline"),
-        internal_networks=agent.get("internal_networks", []),
         is_active=agent.get("is_active", True),
         created_at=agent["created_at"],
         install_command=install_command
