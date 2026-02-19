@@ -166,6 +166,11 @@ export default function NewScanPage() {
     );
   }
 
+  // Check if user has any agents
+  const hasAgents = agents.length > 0;
+  const onlineAgents = agents.filter(a => a.status === 'online');
+  const hasOnlineAgent = onlineAgents.length > 0;
+
   return (
     <div className="space-y-6" data-testid="new-scan-page">
       {/* Header */}
