@@ -1329,7 +1329,7 @@ async def create_agent(
     hashed_token = hash_token(plain_token)
     
     agent = Agent(
-        customer_id=current_user["id"],
+        customer_id=current_user["sub"],
         name=agent_data.name,
         token=hashed_token,
         internal_networks=agent_data.internal_networks
