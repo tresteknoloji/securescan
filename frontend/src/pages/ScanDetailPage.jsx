@@ -315,6 +315,46 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
+      {/* Scan Time Info */}
+      <Card data-testid="scan-time-card">
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              <span className="text-muted-foreground">{t('start_time') || 'Başlangıç'}:</span>
+              <span className="font-medium mono">
+                {scan.started_at ? new Date(scan.started_at).toLocaleString() : '-'}
+              </span>
+            </div>
+            {scan.status === 'completed' && (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span className="text-muted-foreground">{t('end_time') || 'Bitiş'}:</span>
+                <span className="font-medium mono">
+                  {scan.completed_at ? new Date(scan.completed_at).toLocaleString() : '-'}
+                </span>
+              </div>
+            )}
+            {scan.started_at && scan.completed_at && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">{t('duration') || 'Süre'}:</span>
+                <span className="font-medium">
+                  {(() => {
+                    const start = new Date(scan.started_at);
+                    const end = new Date(scan.completed_at);
+                    const diffMs = end - start;
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const mins = Math.floor(diffSec / 60);
+                    const secs = diffSec % 60;
+                    return mins > 0 ? `${mins}dk ${secs}sn` : `${secs}sn`;
+                  })()}
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Iteration Selector */}
       {scan.current_iteration > 1 && (
         <Card data-testid="iteration-selector-card">
