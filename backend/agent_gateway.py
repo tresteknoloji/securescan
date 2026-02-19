@@ -359,7 +359,9 @@ class AgentGateway:
         # Import vulnerability processing logic
         # This will be similar to what scanner.py does
         vulnerabilities = result.get("vulnerabilities", [])
-        ports = result.get("ports", [])
+        ports_count = len(result.get("ports", []))
+        
+        logger.info(f"Processing {len(vulnerabilities)} vulnerabilities and {ports_count} ports for scan {scan_id}")
         
         # Save vulnerabilities
         for vuln_data in vulnerabilities:
