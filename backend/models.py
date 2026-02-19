@@ -202,6 +202,8 @@ class Vulnerability(BaseModel):
     evidence: Optional[str] = None  # Technical evidence of the finding
     is_kev: bool = False  # Is in CISA Known Exploited Vulnerabilities
     source: Optional[str] = None  # Source of finding: port_scan, ssl_scan, nse_scan, web_scan
+    confidence: Optional[str] = None  # Confidence level: confirmed, likely, possible, unlikely, informational
+    has_exploit_ref: bool = False  # Has public exploit reference (informational only)
     created_at: datetime = Field(default_factory=utc_now)
 
 class VulnerabilityResponse(BaseModel):
@@ -223,6 +225,8 @@ class VulnerabilityResponse(BaseModel):
     evidence: Optional[str] = None
     is_kev: bool = False
     source: Optional[str] = None
+    confidence: Optional[str] = None
+    has_exploit_ref: bool = False
     created_at: datetime
 
 # ============== CVE Models ==============
