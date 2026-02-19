@@ -1881,13 +1881,12 @@ class SecureScanAgent:
             
             logger.info(f"Phase 1 - Port Scan: {{cmd}}")
             
-            process = await asyncio.create_subprocess_shell(
-                cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            output = stdout.decode()
+            try:
+                stdout, stderr = await self.run_command_with_heartbeat(cmd, task_id, timeout=600)
+                output = stdout
+            except asyncio.TimeoutError:
+                logger.warning(f"Port scan timeout for {{target}}")
+                output = ""
             
             # Parse nmap output
             ports = self.parse_nmap_output(output)
