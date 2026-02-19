@@ -76,6 +76,44 @@ def get_protocol_color(protocol: str) -> str:
     return colors.get(protocol.lower(), "#64748B")
 
 
+def calculate_duration(start_time: str, end_time: str, lang: str = "en") -> str:
+    """Calculate duration between start and end times"""
+    if not start_time or not end_time:
+        return "-"
+    
+    try:
+        # Parse ISO format dates
+        start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+        end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+        
+        diff = end - start
+        total_seconds = int(diff.total_seconds())
+        
+        if total_seconds < 0:
+            return "-"
+        
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        
+        if lang == "tr":
+            if hours > 0:
+                return f"{hours}sa {minutes}dk {seconds}sn"
+            elif minutes > 0:
+                return f"{minutes}dk {seconds}sn"
+            else:
+                return f"{seconds}sn"
+        else:
+            if hours > 0:
+                return f"{hours}h {minutes}m {seconds}s"
+            elif minutes > 0:
+                return f"{minutes}m {seconds}s"
+            else:
+                return f"{seconds}s"
+    except Exception:
+        return "-"
+
+
 def generate_ports_section(ports_data: Optional[List[Dict[str, Any]]], l: dict, text_muted: str, card_bg: str, card_border: str, branding: Optional[Dict[str, Any]] = None, targets: Optional[List[Dict[str, Any]]] = None) -> str:
     """Generate HTML section for discovered ports"""
     if not ports_data:
