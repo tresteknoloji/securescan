@@ -131,6 +131,11 @@ function AppRoutes() {
         <Route path="/scans" element={<ScansPage />} />
         <Route path="/scans/new" element={<NewScanPage />} />
         <Route path="/scans/:id" element={<ScanDetailPage />} />
+        <Route path="/agents" element={
+          <ProtectedRoute roles={['admin', 'customer']}>
+            <AgentsPage />
+          </ProtectedRoute>
+        } />
         <Route path="/reports" element={<ReportsPage />} />
         <Route
           path="/users"
