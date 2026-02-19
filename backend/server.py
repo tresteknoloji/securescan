@@ -1849,26 +1849,161 @@ class SecureScanAgent:
         return ports
     
     def check_port_vulnerabilities(self, ports: list, target: str):
-        """Check for known vulnerabilities based on open ports"""
+        """Check for known vulnerabilities based on open ports and services"""
         vulnerabilities = []
+        
+        # Dangerous/risky ports
         dangerous_ports = {{
-            21: ("FTP Open", "high", "FTP transmits data in clear text"),
-            23: ("Telnet Open", "critical", "Telnet transmits all data in clear text"),
-            445: ("SMB Open", "high", "SMB has been target of many critical vulnerabilities"),
-            3389: ("RDP Open", "medium", "Remote Desktop Protocol is exposed"),
+            21: ("FTP Service Exposed", "high", "FTP transmits credentials and data in clear text. Consider using SFTP instead."),
+            22: ("SSH Service Exposed", "info", "SSH service is accessible. Ensure strong authentication and key-based login."),
+            23: ("Telnet Service Exposed", "critical", "Telnet transmits all data including passwords in clear text. Disable immediately."),
+            25: ("SMTP Service Exposed", "medium", "Mail server exposed. Verify it's not an open relay."),
+            53: ("DNS Service Exposed", "low", "DNS service accessible. Check for zone transfer vulnerabilities."),
+            80: ("HTTP Service Exposed", "info", "Web server running on HTTP. Consider enforcing HTTPS."),
+            110: ("POP3 Service Exposed", "medium", "POP3 transmits credentials in clear text. Use POP3S instead."),
+            111: ("RPC Service Exposed", "medium", "RPC portmapper exposed. Can leak service information."),
+            135: ("MSRPC Service Exposed", "medium", "Microsoft RPC exposed. Common target for exploits."),
+            139: ("NetBIOS Service Exposed", "high", "NetBIOS exposed. Can leak system information and be exploited."),
+            143: ("IMAP Service Exposed", "medium", "IMAP transmits credentials in clear text. Use IMAPS instead."),
+            443: ("HTTPS Service Exposed", "info", "Web server running on HTTPS."),
+            445: ("SMB Service Exposed", "high", "SMB/CIFS exposed. Target of EternalBlue and other critical exploits."),
+            512: ("rexec Service Exposed", "critical", "Remote execution service exposed without encryption."),
+            513: ("rlogin Service Exposed", "critical", "Remote login service exposed without encryption."),
+            514: ("rsh Service Exposed", "critical", "Remote shell service exposed without encryption."),
+            1433: ("MSSQL Service Exposed", "high", "Microsoft SQL Server exposed to network."),
+            1521: ("Oracle DB Exposed", "high", "Oracle database listener exposed to network."),
+            2049: ("NFS Service Exposed", "high", "Network File System exposed. Check export permissions."),
+            3306: ("MySQL Service Exposed", "high", "MySQL database exposed to network."),
+            3389: ("RDP Service Exposed", "high", "Remote Desktop Protocol exposed. Target of BlueKeep and other exploits."),
+            5432: ("PostgreSQL Exposed", "high", "PostgreSQL database exposed to network."),
+            5900: ("VNC Service Exposed", "high", "VNC remote desktop exposed. Often has weak authentication."),
+            5901: ("VNC Service Exposed", "high", "VNC remote desktop exposed. Often has weak authentication."),
+            6379: ("Redis Service Exposed", "critical", "Redis often runs without authentication. Check configuration."),
+            8080: ("HTTP Proxy/Alt Exposed", "low", "Alternative HTTP port open. May be proxy or admin interface."),
+            8443: ("HTTPS Alt Exposed", "info", "Alternative HTTPS port open."),
+            27017: ("MongoDB Exposed", "critical", "MongoDB exposed. Often runs without authentication by default."),
+            27018: ("MongoDB Exposed", "critical", "MongoDB exposed. Often runs without authentication by default."),
+        }}
+        
+        # Service-based vulnerabilities (regardless of port)
+        risky_services = {{
+            "telnet": ("Telnet Service Detected", "critical", "Telnet detected. All traffic is unencrypted."),
+            "ftp": ("FTP Service Detected", "high", "FTP detected. Credentials transmitted in clear text."),
+            "vnc": ("VNC Service Detected", "high", "VNC detected. Often has weak authentication."),
+            "mysql": ("MySQL Service Detected", "medium", "MySQL database accessible from network."),
+            "postgresql": ("PostgreSQL Detected", "medium", "PostgreSQL database accessible from network."),
+            "mongodb": ("MongoDB Detected", "high", "MongoDB accessible. Verify authentication is enabled."),
+            "redis": ("Redis Detected", "high", "Redis accessible. Verify authentication is enabled."),
+            "smb": ("SMB Service Detected", "high", "SMB file sharing exposed."),
+            "rdp": ("RDP Service Detected", "high", "Remote Desktop exposed to network."),
+            "ms-wbt-server": ("RDP Service Detected", "high", "Remote Desktop exposed to network."),
         }}
         
         for port in ports:
-            if port["state"] == "open" and port["port"] in dangerous_ports:
-                title, severity, desc = dangerous_ports[port["port"]]
+            if port["state"] != "open":
+                continue
+                
+            port_num = port["port"]
+            service = port.get("service", "").lower()
+            version = port.get("version", "")
+            
+            # Check dangerous ports
+            if port_num in dangerous_ports:
+                title, severity, desc = dangerous_ports[port_num]
                 vulnerabilities.append({{
                     "target_value": target,
                     "severity": severity,
                     "title": title,
                     "description": desc,
-                    "port": port["port"],
-                    "service": port["service"]
+                    "port": port_num,
+                    "service": service,
+                    "evidence": f"Port {{port_num}}/tcp open - {{service}} {{version}}".strip()
                 }})
+            
+            # Check risky services (on non-standard ports)
+            elif service in risky_services:
+                title, severity, desc = risky_services[service]
+                vulnerabilities.append({{
+                    "target_value": target,
+                    "severity": severity,
+                    "title": f"{{title}} (Port {{port_num}})",
+                    "description": desc,
+                    "port": port_num,
+                    "service": service,
+                    "evidence": f"Port {{port_num}}/tcp open - {{service}} {{version}}".strip()
+                }})
+            
+            # Check for outdated/vulnerable versions in version string
+            if version:
+                version_lower = version.lower()
+                
+                # OpenSSH vulnerabilities
+                if "openssh" in version_lower:
+                    # Check for old versions
+                    import re
+                    ssh_ver_match = re.search(r'openssh[_\s]*([\d.]+)', version_lower)
+                    if ssh_ver_match:
+                        ssh_ver = ssh_ver_match.group(1)
+                        try:
+                            major_ver = float(ssh_ver.split('.')[0] + '.' + ssh_ver.split('.')[1])
+                            if major_ver < 7.0:
+                                vulnerabilities.append({{
+                                    "target_value": target,
+                                    "severity": "high",
+                                    "title": "Outdated OpenSSH Version",
+                                    "description": f"OpenSSH {{ssh_ver}} is outdated and may have known vulnerabilities.",
+                                    "port": port_num,
+                                    "service": service,
+                                    "evidence": version
+                                }})
+                        except:
+                            pass
+                
+                # Apache vulnerabilities
+                if "apache" in version_lower:
+                    import re
+                    apache_ver_match = re.search(r'apache[/\s]*([\d.]+)', version_lower)
+                    if apache_ver_match:
+                        apache_ver = apache_ver_match.group(1)
+                        try:
+                            parts = apache_ver.split('.')
+                            if len(parts) >= 2:
+                                major_minor = float(parts[0] + '.' + parts[1])
+                                if major_minor < 2.4:
+                                    vulnerabilities.append({{
+                                        "target_value": target,
+                                        "severity": "high",
+                                        "title": "Outdated Apache Version",
+                                        "description": f"Apache {{apache_ver}} is outdated and may have known vulnerabilities.",
+                                        "port": port_num,
+                                        "service": service,
+                                        "evidence": version
+                                    }})
+                        except:
+                            pass
+                
+                # nginx vulnerabilities
+                if "nginx" in version_lower:
+                    import re
+                    nginx_ver_match = re.search(r'nginx[/\s]*([\d.]+)', version_lower)
+                    if nginx_ver_match:
+                        nginx_ver = nginx_ver_match.group(1)
+                        try:
+                            parts = nginx_ver.split('.')
+                            if len(parts) >= 2:
+                                major_minor = float(parts[0] + '.' + parts[1])
+                                if major_minor < 1.18:
+                                    vulnerabilities.append({{
+                                        "target_value": target,
+                                        "severity": "medium",
+                                        "title": "Outdated Nginx Version",
+                                        "description": f"Nginx {{nginx_ver}} may have known vulnerabilities. Consider updating.",
+                                        "port": port_num,
+                                        "service": service,
+                                        "evidence": version
+                                    }})
+                        except:
+                            pass
         
         return vulnerabilities
     
