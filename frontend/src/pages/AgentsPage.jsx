@@ -43,7 +43,6 @@ import {
   WifiOff,
   Settings,
   Play,
-  Network,
   Clock,
   Server,
   Key,
