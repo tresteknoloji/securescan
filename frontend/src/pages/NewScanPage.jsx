@@ -185,12 +185,136 @@ export default function NewScanPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">{t('new_scan')}</h1>
-          <p className="text-muted-foreground">Configure and start a new vulnerability scan</p>
+          <p className="text-muted-foreground">
+            {language === 'tr' ? 'Yeni bir zafiyet taraması yapılandırın ve başlatın' : 'Configure and start a new vulnerability scan'}
+          </p>
         </div>
       </div>
 
+      {/* No Agent Warning */}
+      {!hasAgents && (
+        <Alert variant="destructive" data-testid="no-agent-warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>{language === 'tr' ? 'Agent Gerekli' : 'Agent Required'}</AlertTitle>
+          <AlertDescription className="mt-2">
+            {language === 'tr' 
+              ? 'Tarama yapabilmek için önce bir agent eklemeniz gerekiyor. Agent, uzak sunucunuzda çalışarak tarama işlemlerini gerçekleştirir.'
+              : 'You need to add an agent before you can start a scan. The agent runs on your remote server to perform the scanning operations.'}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => navigate('/agents')}
+            >
+              <HardDrive className="w-4 h-4 mr-2" />
+              {language === 'tr' ? 'Agent Ekle' : 'Add Agent'}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* No Online Agent Warning */}
+      {hasAgents && !hasOnlineAgent && (
+        <Alert variant="destructive" data-testid="no-online-agent-warning">
+          <WifiOff className="h-4 w-4" />
+          <AlertTitle>{language === 'tr' ? 'Çevrimiçi Agent Yok' : 'No Online Agent'}</AlertTitle>
+          <AlertDescription>
+            {language === 'tr' 
+              ? 'Tarama başlatmak için en az bir agent\'ın çevrimiçi olması gerekiyor. Agent\'larınızın durumunu kontrol edin.'
+              : 'At least one agent must be online to start a scan. Check your agents status.'}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => navigate('/agents')}
+            >
+              <HardDrive className="w-4 h-4 mr-2" />
+              {language === 'tr' ? 'Agent\'ları Görüntüle' : 'View Agents'}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Agent Selection - Full Width */}
+          <Card className="lg:col-span-3" data-testid="agent-selection-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HardDrive className="h-5 w-5" />
+                {language === 'tr' ? 'Agent Seçimi' : 'Select Agent'}
+              </CardTitle>
+              <CardDescription>
+                {language === 'tr' 
+                  ? 'Taramayı gerçekleştirecek agent\'ı seçin'
+                  : 'Select the agent that will perform the scan'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {agents.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {agents.map((agent) => {
+                    const isOnline = agent.status === 'online';
+                    const isSelected = selectedAgent === agent.id;
+                    return (
+                      <div
+                        key={agent.id}
+                        onClick={() => isOnline && setSelectedAgent(agent.id)}
+                        className={`p-4 rounded-lg border-2 transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/10'
+                            : isOnline
+                              ? 'border-border hover:border-primary/50 cursor-pointer'
+                              : 'border-border/50 opacity-50 cursor-not-allowed'
+                        }`}
+                        data-testid={`agent-option-${agent.id}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Server className="w-4 h-4 text-primary" />
+                            <span className="font-medium">{agent.name}</span>
+                          </div>
+                          {isOnline ? (
+                            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                              <Wifi className="w-3 h-3 mr-1" />
+                              {language === 'tr' ? 'Çevrimiçi' : 'Online'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              <WifiOff className="w-3 h-3 mr-1" />
+                              {language === 'tr' ? 'Çevrimdışı' : 'Offline'}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {agent.ip_address || '-'}
+                        </p>
+                        {agent.os_info && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {agent.os_info}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <HardDrive className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <p>{language === 'tr' ? 'Henüz agent eklenmemiş' : 'No agents available'}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => navigate('/agents')}
+                  >
+                    {language === 'tr' ? 'Agent Ekle' : 'Add Agent'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Scan Name */}
           <Card className="lg:col-span-3" data-testid="scan-name-card">
             <CardHeader>
@@ -203,8 +327,9 @@ export default function NewScanPage() {
               <Input
                 value={scanName}
                 onChange={(e) => setScanName(e.target.value)}
-                placeholder="Enter scan name..."
+                placeholder={language === 'tr' ? 'Tarama adı girin...' : 'Enter scan name...'}
                 required
+                disabled={!hasOnlineAgent}
                 data-testid="scan-name-input"
                 className="max-w-md"
               />
