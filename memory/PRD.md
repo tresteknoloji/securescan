@@ -172,6 +172,52 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - Sistem bilgisi toplama
 - Tarama sonuçları işleme
 
+### Gelişmiş Agent Tarama Yetenekleri (2026-02-19) - ✅ TAMAMLANDI
+
+Agent artık temel port taramasının ötesinde kapsamlı güvenlik kontrolleri yapabilmektedir:
+
+#### 1. SSL/TLS Güvenlik Analizi
+- **Protokol Kontrolü**: SSLv2, SSLv3, TLSv1.0, TLSv1.1 gibi eski protokollerin tespiti
+- **Cipher Suite Analizi**: RC4, DES, 3DES, MD5, NULL, EXPORT gibi zayıf şifrelerin tespiti
+- **Sertifika Kontrolleri**: Süresi dolmuş, self-signed sertifika tespiti
+- **DH Parametre Kontrolü**: Logjam zafiyetine karşı zayıf DH parametreleri tespiti
+- **Nmap Scripts**: `ssl-enum-ciphers`, `ssl-cert`, `ssl-date`, `ssl-known-key`, `ssl-dh-params`
+
+#### 2. NSE Vulnerability Script Taraması
+- **Nmap Scripts**: `--script=vuln,auth,default` kategorileri
+- **CVE Tespiti**: Script çıktılarından CVE referansları çıkarma
+- **SMB Zafiyetleri**: EternalBlue ve benzeri SMB exploit tespiti
+- **HTTP Zafiyetleri**: Web sunucu zafiyetleri tespiti
+- **FTP Anonymous**: Anonim FTP giriş tespiti
+
+#### 3. Aktif Web Güvenlik Kontrolleri
+- **SQL Injection**: Basit SQL injection probe'ları
+- **XSS (Cross-Site Scripting)**: Reflected XSS test payload'ları
+- **LFI (Local File Inclusion)**: `../etc/passwd` gibi yol geçişi testleri
+- **Directory Traversal**: URL encoding ile yol geçişi testleri
+- **Sensitive File Exposure**: `.env`, `.git/config`, `backup.sql` gibi hassas dosya tespiti
+- **Admin Panel Detection**: `/admin`, `/phpmyadmin`, `/wp-admin` gibi admin panelleri
+
+#### 4. Teknik Uygulama
+- **Agent Kodu**: `backend/server.py` içindeki `get_agent_install_script` fonksiyonunda
+- **Fonksiyonlar**:
+  - `run_port_scan()`: Kapsamlı tarama koordinasyonu (4 faz)
+  - `parse_ssl_findings()`: SSL/TLS bulgu ayrıştırma
+  - `parse_nse_findings()`: NSE script bulgu ayrıştırma
+  - `run_web_checks()`: Aktif web güvenlik kontrolleri
+- **Gateway İşleme**: `agent_gateway.py` - `process_scan_results()` fonksiyonu
+  - SSL, NSE ve Web bulgularını ayrı ayrı işler
+  - CVE veritabanından ek bilgi çeker
+  - Deduplikasyon yapar
+
+#### 5. UI Güncellemeleri
+- **Yeni Badge'ler** (`ScanDetailPage.jsx`):
+  - 🔒 **SSL/TLS** (sarı) - `source: ssl_scan`
+  - 💻 **NSE Script** (cyan) - `source: nse_scan`
+  - 🌐 **Web Check** (pembe) - `source: web_scan`
+- **Evidence Alanı**: Bulguların teknik kanıtları gösteriliyor
+- **Vulnerability Model**: `evidence`, `is_kev`, `source` alanları eklendi
+
 ### Düzeltmeler (2026-02-17) - ✅ TAMAMLANDI
 
 #### CVE Referansları Raporda Görünmeme Hatası
