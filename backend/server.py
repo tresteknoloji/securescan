@@ -1771,7 +1771,7 @@ class SecureScanAgent:
         }}
     
     async def run_port_scan(self, command: str, params: dict, task_id: str):
-        """Run nmap scan with progress updates"""
+        """Run comprehensive nmap scan with SSL/TLS, NSE scripts, and web checks"""
         # Get targets - can be single target or list
         targets = params.get("targets", [])
         if not targets:
@@ -1783,53 +1783,469 @@ class SecureScanAgent:
         
         port_range = params.get("port_range", "1-1000")
         scan_type = params.get("scan_type", "quick")
+        check_ssl = params.get("check_ssl", True)
         
         all_ports = []
-        all_vulnerabilities = []
+        all_ssl_findings = []
+        all_nse_findings = []
+        all_web_findings = []
         
-        for target in targets:
+        total_targets = len(targets)
+        
+        for idx, target in enumerate(targets):
             if not target:
                 continue
-                
-            # Build nmap command
+            
+            base_progress = int((idx / total_targets) * 80)
+            
+            # Phase 1: Port Discovery & Service Detection (20% per target)
+            await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 5}})
+            
+            # Build nmap command with enhanced service detection
             if scan_type == "quick":
-                cmd = f"nmap -sV -T4 --top-ports 100 {{target}}"
+                cmd = f"nmap -sV -sC -T4 --top-ports 100 --version-intensity 5 {{target}}"
             elif scan_type == "stealth":
-                cmd = f"nmap -sS -sV -T2 -p {{port_range}} {{target}}"
+                cmd = f"nmap -sS -sV -T2 -p {{port_range}} --version-intensity 5 {{target}}"
             else:
-                cmd = f"nmap -sV -sC -T4 -p {{port_range}} {{target}}"
+                cmd = f"nmap -sV -sC -T4 -p {{port_range}} --version-intensity 7 --script=banner {{target}}"
             
-            logger.info(f"Running: {{cmd}}")
-            
-            # Send progress
-            await self.send({{"type": "task_progress", "task_id": task_id, "progress": 10}})
+            logger.info(f"Phase 1 - Port Scan: {{cmd}}")
             
             process = await asyncio.create_subprocess_shell(
                 cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
             stdout, stderr = await process.communicate()
             output = stdout.decode()
             
-            # Parse nmap output - just extract raw port data
+            # Parse nmap output
             ports = self.parse_nmap_output(output)
             
             # Add target info to ports
             for port in ports:
                 port["target"] = target
-            
             all_ports.extend(ports)
             
-            # Update progress
-            await self.send({{"type": "task_progress", "task_id": task_id, "progress": 50}})
+            # Get open ports for further scanning
+            open_ports = [p["port"] for p in ports if p.get("state") == "open"]
+            
+            if not open_ports:
+                continue
+            
+            # Phase 2: SSL/TLS Analysis (if enabled and SSL ports found)
+            ssl_ports = [p for p in open_ports if p in [443, 8443, 993, 995, 465, 636, 989, 990] or any(
+                "ssl" in ports[i].get("service", "").lower() or "https" in ports[i].get("service", "").lower()
+                for i, pp in enumerate(ports) if pp["port"] == p
+            )]
+            
+            # Also check common HTTPS ports
+            for p in open_ports:
+                if p not in ssl_ports and p in [443, 8443, 4443, 9443]:
+                    ssl_ports.append(p)
+            
+            if check_ssl and ssl_ports:
+                await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 15}})
+                
+                ssl_port_str = ",".join(str(p) for p in ssl_ports[:5])  # Limit to 5 ports
+                ssl_cmd = f"nmap -sV -p {{ssl_port_str}} --script=ssl-enum-ciphers,ssl-cert,ssl-date,ssl-known-key,ssl-dh-params {{target}}"
+                
+                logger.info(f"Phase 2 - SSL Scan: {{ssl_cmd}}")
+                
+                process = await asyncio.create_subprocess_shell(
+                    ssl_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await process.communicate()
+                ssl_output = stdout.decode()
+                
+                # Parse SSL findings
+                ssl_findings = self.parse_ssl_findings(ssl_output, target)
+                all_ssl_findings.extend(ssl_findings)
+            
+            # Phase 3: NSE Vulnerability Scripts
+            await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 25}})
+            
+            # Run vulnerability scripts on open ports
+            port_str = ",".join(str(p) for p in open_ports[:20])  # Limit to 20 ports
+            nse_cmd = f"nmap -sV -p {{port_str}} --script=vuln,auth,default {{target}}"
+            
+            logger.info(f"Phase 3 - NSE Vuln Scan: {{nse_cmd}}")
+            
+            try:
+                process = await asyncio.create_subprocess_shell(
+                    nse_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
+                nse_output = stdout.decode()
+                
+                # Parse NSE findings
+                nse_findings = self.parse_nse_findings(nse_output, target)
+                all_nse_findings.extend(nse_findings)
+            except asyncio.TimeoutError:
+                logger.warning(f"NSE scan timeout for {{target}}")
+            
+            # Phase 4: Active Web Checks (for HTTP/HTTPS ports)
+            await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 35}})
+            
+            web_ports = [p for p in open_ports if p in [80, 443, 8080, 8443, 8000, 8888, 3000, 5000]]
+            
+            if web_ports:
+                web_findings = await self.run_web_checks(target, web_ports, task_id)
+                all_web_findings.extend(web_findings)
         
-        # Return raw port data - CVE/vulnerability matching done on panel side
+        # Final progress
+        await self.send({{"type": "task_progress", "task_id": task_id, "progress": 90}})
+        
+        # Return comprehensive scan data
         return {{
             "ports": all_ports,
-            "targets_scanned": targets
+            "targets_scanned": targets,
+            "ssl_findings": all_ssl_findings,
+            "nse_findings": all_nse_findings,
+            "web_findings": all_web_findings
         }}
+    
+    def parse_ssl_findings(self, output: str, target: str):
+        """Parse SSL/TLS scan output for vulnerabilities"""
+        findings = []
+        current_port = None
+        
+        lines = output.split("\\n")
+        
+        for i, line in enumerate(lines):
+            # Get port context
+            import re
+            port_match = re.search(r"(\\d+)/tcp", line)
+            if port_match:
+                current_port = int(port_match.group(1))
+            
+            # Check for weak SSL/TLS versions
+            if "SSLv2" in line or "SSLv3" in line:
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "ssl",
+                    "severity": "critical",
+                    "title": "Deprecated SSL Protocol Supported",
+                    "description": "Server supports SSLv2/SSLv3 which have known vulnerabilities (POODLE, DROWN).",
+                    "evidence": line.strip()
+                }})
+            
+            if "TLSv1.0" in line:
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "ssl",
+                    "severity": "high",
+                    "title": "TLS 1.0 Supported",
+                    "description": "TLS 1.0 is deprecated and vulnerable to BEAST attack.",
+                    "evidence": line.strip()
+                }})
+            
+            if "TLSv1.1" in line:
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "ssl",
+                    "severity": "medium",
+                    "title": "TLS 1.1 Supported",
+                    "description": "TLS 1.1 is deprecated. Use TLS 1.2 or higher.",
+                    "evidence": line.strip()
+                }})
+            
+            # Check for weak ciphers
+            weak_ciphers = ["RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon", "SEED", "IDEA"]
+            for cipher in weak_ciphers:
+                if cipher in line.upper():
+                    findings.append({{
+                        "target": target,
+                        "port": current_port,
+                        "type": "ssl",
+                        "severity": "high" if cipher in ["RC4", "DES", "NULL", "EXPORT"] else "medium",
+                        "title": f"Weak Cipher Supported: {{cipher}}",
+                        "description": f"Server supports weak cipher suite containing {{cipher}}.",
+                        "evidence": line.strip()
+                    }})
+                    break
+            
+            # Check for certificate issues
+            if "commonName" in line or "subject:" in line.lower():
+                if "expired" in line.lower():
+                    findings.append({{
+                        "target": target,
+                        "port": current_port,
+                        "type": "ssl",
+                        "severity": "high",
+                        "title": "Expired SSL Certificate",
+                        "description": "SSL certificate has expired.",
+                        "evidence": line.strip()
+                    }})
+            
+            if "self-signed" in line.lower() or "selfsigned" in line.lower():
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "ssl",
+                    "severity": "medium",
+                    "title": "Self-Signed Certificate",
+                    "description": "Server uses a self-signed certificate which cannot be trusted.",
+                    "evidence": line.strip()
+                }})
+            
+            # Check for CRIME/BREACH
+            if "compression" in line.lower() and ("enabled" in line.lower() or "yes" in line.lower()):
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "ssl",
+                    "severity": "medium",
+                    "title": "TLS Compression Enabled",
+                    "description": "TLS compression is enabled, vulnerable to CRIME attack.",
+                    "evidence": line.strip()
+                }})
+            
+            # Check for weak DH params
+            if "dh" in line.lower() and ("512" in line or "768" in line or "1024" in line):
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "ssl",
+                    "severity": "high",
+                    "title": "Weak Diffie-Hellman Parameters",
+                    "description": "Server uses weak DH parameters (< 2048 bits), vulnerable to Logjam.",
+                    "evidence": line.strip()
+                }})
+        
+        return findings
+    
+    def parse_nse_findings(self, output: str, target: str):
+        """Parse NSE vulnerability script output"""
+        findings = []
+        current_port = None
+        current_vuln = None
+        
+        lines = output.split("\\n")
+        
+        vuln_keywords = [
+            "VULNERABLE", "CVE-", "MS17-", "MS08-", "MS12-", "MS15-",
+            "exploit", "Exploitable", "vulnerable", "backdoor", 
+            "anonymous", "weak password", "default password",
+            "authentication bypass", "remote code execution"
+        ]
+        
+        for i, line in enumerate(lines):
+            import re
+            
+            # Get port context
+            port_match = re.search(r"(\\d+)/tcp", line)
+            if port_match:
+                current_port = int(port_match.group(1))
+            
+            # Check for vulnerability indicators
+            for keyword in vuln_keywords:
+                if keyword.lower() in line.lower():
+                    # Extract CVE if present
+                    cve_match = re.search(r"(CVE-\\d{{4}}-\\d{{4,}})", line, re.IGNORECASE)
+                    cve_id = cve_match.group(1).upper() if cve_match else None
+                    
+                    # Determine severity
+                    if "critical" in line.lower() or "remote code execution" in line.lower():
+                        severity = "critical"
+                    elif "VULNERABLE" in line or "exploit" in line.lower():
+                        severity = "high"
+                    elif "weak" in line.lower() or "default" in line.lower():
+                        severity = "medium"
+                    else:
+                        severity = "medium"
+                    
+                    # Get title from script name or CVE
+                    title = cve_id if cve_id else f"Vulnerability Found: {{keyword}}"
+                    
+                    # Look for description in next few lines
+                    description = line.strip()
+                    for j in range(1, min(4, len(lines) - i)):
+                        if lines[i + j].strip() and not lines[i + j].strip().startswith("|"):
+                            break
+                        description += " " + lines[i + j].strip()
+                    
+                    findings.append({{
+                        "target": target,
+                        "port": current_port,
+                        "type": "nse",
+                        "severity": severity,
+                        "title": title,
+                        "description": description[:500],
+                        "cve_id": cve_id,
+                        "evidence": line.strip()
+                    }})
+                    break
+            
+            # Check for specific NSE script results
+            if "smb-vuln-" in line.lower():
+                findings.append({{
+                    "target": target,
+                    "port": current_port or 445,
+                    "type": "nse",
+                    "severity": "critical",
+                    "title": "SMB Vulnerability Detected",
+                    "description": line.strip(),
+                    "evidence": line.strip()
+                }})
+            
+            if "http-vuln-" in line.lower():
+                findings.append({{
+                    "target": target,
+                    "port": current_port or 80,
+                    "type": "nse",
+                    "severity": "high",
+                    "title": "HTTP Vulnerability Detected",
+                    "description": line.strip(),
+                    "evidence": line.strip()
+                }})
+            
+            if "ftp-anon" in line.lower() and "allowed" in line.lower():
+                findings.append({{
+                    "target": target,
+                    "port": current_port or 21,
+                    "type": "nse",
+                    "severity": "high",
+                    "title": "Anonymous FTP Login Allowed",
+                    "description": "FTP server allows anonymous login. Sensitive files may be exposed.",
+                    "evidence": line.strip()
+                }})
+        
+        return findings
+    
+    async def run_web_checks(self, target: str, ports: list, task_id: str):
+        """Run active web vulnerability checks"""
+        findings = []
+        
+        import urllib.request
+        import urllib.error
+        
+        for port in ports[:3]:  # Limit to 3 ports
+            protocol = "https" if port in [443, 8443, 4443] else "http"
+            base_url = f"{{protocol}}://{{target}}:{{port}}"
+            
+            # Test payloads for common vulnerabilities
+            tests = [
+                # SQL Injection test
+                {{
+                    "name": "SQL Injection",
+                    "paths": ["/login?id=1'", "/search?q=test'", "/user?id=1 OR 1=1"],
+                    "indicators": ["sql", "syntax", "mysql", "postgresql", "oracle", "sqlite", "odbc", "query"],
+                    "severity": "critical"
+                }},
+                # XSS test
+                {{
+                    "name": "Reflected XSS",
+                    "paths": ["/search?q=<script>alert(1)</script>", "/?name=<img src=x onerror=alert(1)>"],
+                    "indicators": ["<script>alert(1)</script>", "<img src=x"],
+                    "severity": "high"
+                }},
+                # LFI test
+                {{
+                    "name": "Local File Inclusion",
+                    "paths": ["/page?file=../../../etc/passwd", "/view?path=....//....//etc/passwd"],
+                    "indicators": ["root:", "/bin/bash", "daemon:", "nobody:"],
+                    "severity": "critical"
+                }},
+                # Directory traversal
+                {{
+                    "name": "Directory Traversal",
+                    "paths": ["/static/../../../etc/passwd", "/images/..%2f..%2f..%2fetc/passwd"],
+                    "indicators": ["root:", "/bin/bash", "daemon:"],
+                    "severity": "critical"
+                }},
+                # Common sensitive files
+                {{
+                    "name": "Sensitive File Exposure",
+                    "paths": ["/.env", "/.git/config", "/config.php.bak", "/web.config", "/wp-config.php.bak"],
+                    "indicators": ["password", "secret", "api_key", "database", "[core]", "repositoryformatversion"],
+                    "severity": "high"
+                }},
+                # Admin panels
+                {{
+                    "name": "Admin Panel Exposed",
+                    "paths": ["/admin", "/administrator", "/phpmyadmin", "/wp-admin"],
+                    "indicators": ["login", "password", "admin", "dashboard"],
+                    "severity": "medium",
+                    "check_status": True
+                }}
+            ]
+            
+            for test in tests:
+                for path in test["paths"]:
+                    try:
+                        url = f"{{base_url}}{{path}}"
+                        req = urllib.request.Request(
+                            url, 
+                            headers={{"User-Agent": "SecureScan-Agent/1.0"}}
+                        )
+                        
+                        # Use shorter timeout
+                        import ssl
+                        ctx = ssl.create_default_context()
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
+                        
+                        try:
+                            response = urllib.request.urlopen(req, timeout=5, context=ctx)
+                            content = response.read().decode('utf-8', errors='ignore').lower()
+                            status = response.getcode()
+                            
+                            # Check for vulnerability indicators
+                            for indicator in test["indicators"]:
+                                if indicator.lower() in content:
+                                    findings.append({{
+                                        "target": target,
+                                        "port": port,
+                                        "type": "web",
+                                        "severity": test["severity"],
+                                        "title": f"{{test['name']}} Possible",
+                                        "description": f"Possible {{test['name']}} vulnerability detected at {{path}}",
+                                        "evidence": f"URL: {{url}} | Indicator: {{indicator}} found in response"
+                                    }})
+                                    break
+                            
+                            # Check for accessible admin panels (status 200)
+                            if test.get("check_status") and status == 200:
+                                findings.append({{
+                                    "target": target,
+                                    "port": port,
+                                    "type": "web",
+                                    "severity": test["severity"],
+                                    "title": f"{{test['name']}}",
+                                    "description": f"{{path}} is accessible (HTTP 200)",
+                                    "evidence": f"URL: {{url}} returned HTTP {{status}}"
+                                }})
+                                break
+                            
+                        except urllib.error.HTTPError as e:
+                            # Some errors also indicate vulnerabilities
+                            if e.code == 500:
+                                error_content = e.read().decode('utf-8', errors='ignore').lower()
+                                for indicator in test["indicators"]:
+                                    if indicator.lower() in error_content:
+                                        findings.append({{
+                                            "target": target,
+                                            "port": port,
+                                            "type": "web",
+                                            "severity": test["severity"],
+                                            "title": f"{{test['name']}} Possible (Error-Based)",
+                                            "description": f"Server error suggests possible {{test['name']}} at {{path}}",
+                                            "evidence": f"URL: {{url}} | HTTP 500 with {{indicator}} in error"
+                                        }})
+                                        break
+                    except Exception as e:
+                        # Silently skip connection errors
+                        pass
+        
+        return findings
     
     def parse_nmap_output(self, output: str):
         """Parse nmap output to extract port info"""
