@@ -2689,6 +2689,21 @@ class SecureScanAgent:
         if self.ws:
             await self.ws.send(json.dumps(message))
     
+    async def send_with_retry(self, message: dict, max_retries: int = 3):
+        """Send a message with retry logic for critical messages like task_completed"""
+        for attempt in range(max_retries):
+            try:
+                if self.ws and self.ws.open:
+                    await self.ws.send(json.dumps(message))
+                    return True
+                else:
+                    logger.warning(f"WebSocket not connected, attempt {{attempt + 1}}/{{max_retries}}")
+                    await asyncio.sleep(2)
+            except Exception as e:
+                logger.error(f"Send failed (attempt {{attempt + 1}}): {{e}}")
+                await asyncio.sleep(2)
+        return False
+    
     async def connect(self):
         """Connect to the panel WebSocket"""
         import websockets
@@ -2698,7 +2713,13 @@ class SecureScanAgent:
         
         while self.running:
             try:
-                async with websockets.connect(ws_url) as ws:
+                # Increased ping interval and timeout for long-running scans
+                async with websockets.connect(
+                    ws_url,
+                    ping_interval=60,  # Send ping every 60 seconds
+                    ping_timeout=120,  # Wait 120 seconds for pong
+                    close_timeout=30
+                ) as ws:
                     self.ws = ws
                     logger.info("Connected to SecureScan panel")
                     
