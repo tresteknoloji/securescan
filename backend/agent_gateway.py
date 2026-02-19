@@ -100,14 +100,15 @@ class AgentGateway:
             # Message loop
             while True:
                 try:
-                    # Extended timeout for long-running scans
+                    # Very long timeout for long-running scans (20 minutes)
+                    # Agent sends heartbeats during scans to keep connection alive
                     data = await asyncio.wait_for(
                         websocket.receive_text(),
-                        timeout=self.heartbeat_interval * 3  # 3 minutes before timeout
+                        timeout=1200  # 20 minutes - allows for comprehensive scans
                     )
                     await self.handle_message(agent_id, json.loads(data))
                 except asyncio.TimeoutError:
-                    # No message received, check if connection is alive
+                    # No message received in 20 minutes, check if connection is alive
                     try:
                         await websocket.send_json({"type": "ping"})
                     except Exception:
