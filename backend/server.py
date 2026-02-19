@@ -1813,20 +1813,21 @@ class SecureScanAgent:
             stdout, stderr = await process.communicate()
             output = stdout.decode()
             
-            # Parse nmap output
+            # Parse nmap output - just extract raw port data
             ports = self.parse_nmap_output(output)
-            vulnerabilities = self.check_port_vulnerabilities(ports, target)
             
             # Add target info to ports
             for port in ports:
                 port["target"] = target
             
             all_ports.extend(ports)
-            all_vulnerabilities.extend(vulnerabilities)
+            
+            # Update progress
+            await self.send({{"type": "task_progress", "task_id": task_id, "progress": 50}})
         
+        # Return raw port data - CVE/vulnerability matching done on panel side
         return {{
             "ports": all_ports,
-            "vulnerabilities": all_vulnerabilities,
             "targets_scanned": targets
         }}
     
