@@ -126,6 +126,7 @@ const defaultTranslations = {
     dashboard: "Kontrol Paneli",
     targets: "Hedefler",
     scans: "Taramalar",
+    agents: "Agentlar",
     reports: "Raporlar",
     users: "Kullanıcılar",
     settings: "Ayarlar",
