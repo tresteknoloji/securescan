@@ -3,7 +3,6 @@ The user requested a vulnerability scanning panel similar to Nessus.
 - **Scanning:** Scan IPs/domains using tools like Nmap, with CVE-based detection.
 - **Reporting:** Live results, with final reports in HTML/PDF. Reports must be customizable (logo, title, brand name).
 - **Roles & Permissions:** Admin, Reseller, and Customer roles.
-- **Vulnerability Management:** Findings graded by severity (INFO to CRITICAL).
 - **Data & History:** Save scan history.
 - **Technical Stack:** Modern, extensible solution with custom JWT authentication and a multi-language (TR/EN) interface.
 
@@ -13,152 +12,145 @@ The user requested a vulnerability scanning panel similar to Nessus.
 3.  A corporate-style landing page is needed.
 4.  The footer must display © 2026 Tres Technology LLC.
 5.  All Made with Emergent branding must be removed.
-6.  A future lightweight agent for local network scanning should be possible.
-7.  The scanner's value comes from its detection engine, which should use multiple sources (MITRE, CISA KEV, Exploit-DB) and have a multi-layered architecture.
+6.  The scanner's value comes from its detection engine, which should use multiple sources (MITRE, CISA KEV, Exploit-DB) and have a multi-layered architecture.
+7.  All scans must be executed via remote agents, not on the panel server itself, for security and scalability.
 
 **User's preferred language**: Türkçe
 
 **what currently exists?**
-A full-stack application with a FastAPI backend and React frontend. It features role-based access control (Admin, Reseller, Customer), JWT authentication, and a comprehensive scanning engine.
+A full-stack application with a FastAPI backend and React frontend. It features role-based access control, JWT authentication, on-demand themed reporting, and scan history with iterations.
 
-The architecture has been refactored to support **scan iterations**, where re-scans are tracked as historical versions of the original scan. Reports are now generated **on-demand** with a **light/dark theme** option, reducing server storage. Reports have been enhanced to include a list of **detected open ports** and now **group vulnerabilities by target**, with target names displayed for clarity.
+The application's core architecture has been fundamentally refactored to an **agent-based model**. All scans are now executed on remote lightweight Python agents deployed on client Linux machines. The central panel communicates with these agents in real-time via a **WebSocket gateway**.
 
-The backend includes a CVE synchronization module (NVD, CISA KEV), an admin-only CVE Database page with full Turkish translations and corrected statistics, a service fingerprinting engine, a Real Risk Score calculator, and background scan processing. Error logging has been improved by saving failure reasons for scans to the database.
+The panel now includes:
+-   **Agent Management Page**: A UI for creating agents, viewing their status (online/offline), and generating one-time installation commands.
+-   **Dynamic Agent Installation**: A secure API endpoint () that generates a bash script containing the full agent code. This script installs the agent as a  service on the target machine.
+-   **Agent-driven Scans**: The New Scan and Rescan functionalities have been entirely rewritten to dispatch scan tasks to selected online agents. The panel server no longer performs scans locally.
+-   **Centralized Intelligence**: Agents only run  to collect raw port, service, and version data. All vulnerability analysis (dangerous port checks, CVE/KEV lookups) is performed on the panel's backend after receiving the raw data, ensuring the intelligence remains on the central server.
 
 **Last working item**:
--   **Last item agent was working**: The user reported that CVE  (solution links) were still not appearing in the final reports. The agent investigated and traced the issue to the data ingestion step in the CVE synchronization module.
--   **Status**: IN PROGRESS
+-   **Last item agent was working**: The user requested to enhance the agent's scanning capabilities. The agent agreed to a plan to implement more advanced scanning techniques.
+-   **Status**: NOT STARTED
 -   **Agent Testing Done**: N
--   **Which testing method agent to use?**: backend testing agent. The fix requires modifying , running a new CVE sync, executing a scan, and then generating a report. The testing agent should verify that the  field in the generated report's HTML contains a valid HTTP/HTTPS link.
+-   **Which testing method agent to use?**: both. This is a significant feature enhancement that will touch the agent's code (in ), the backend gateway () for processing new results, and potentially the database models and frontend UI to display new types of findings. A full end-to-end test will be required.
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   Issue 1: CVE reference links are missing in reports (P0).
--   Issue 2: The reason for a failed scan is not displayed in the UI (P1).
-
-**Issues Detail**:
--   **Issue 1: CVE reference links are missing in reports**
-    -   **Attempted fixes**: The agent confirmed the issue was not in the report generation template but in the database itself. The  field was not being extracted and saved during the CVE synchronization process. The agent located the  function in  as the source of the problem.
-    -   **Next debug checklist**:
-        1.  Modify the  function in  to correctly parse and extract the  array from the raw NVD CVE data.
-        2.  Add the extracted  list to the  dictionary before it's saved to the MongoDB  collection.
-        3.  Run at least an incremental CVE sync to populate the  field for new and existing CVEs.
-        4.  Run a new scan on a target known to have vulnerabilities with CVEs.
-        5.  Generate a report for the new scan and verify that the Solution or Reference link appears in the vulnerability details.
-    -   **Why fix this issue and what will be achieved with the fix?**: This provides users with direct links to vulnerability advisories, which is critical for remediation and validation.
-    -   **Status**: IN PROGRESS
-    -   **Is recurring issue?**: Y
-    -   **Should Test frontend/backend/both after fix?**: backend
-    -   **Blocked on other issue**: None
-
--   **Issue 2: The reason for a failed scan is not displayed in the UI**
-    -   **Attempted fixes**: The agent successfully added a  field to the  model in  and updated  to save the exception message to this field when a scan fails. The backend work is complete.
-    -   **Next debug checklist**:
-        1.  In , modify the component to fetch and display the  from the scan object.
-        2.  This information should be displayed prominently in a card or alert box if the  is 'failed'.
-    -   **Why fix this issue and what will be achieved with the fix?**: This will allow the user to self-diagnose scan failures without needing to check server logs.
-    -   **Status**: IN PROGRESS
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: frontend
-    -   **Blocked on other issue**: None
+There are no pending bugs. The previous issues regarding missing CVE references and displaying scan failure reasons have been resolved. The current work is a new feature request.
 
 **In progress Task List**:
-- There are no other in-progress tasks. The pending work is captured in the issue list above.
+-   **Task 1: Enhance Agent Scanning Capabilities (P0)**
+    -   **Where to resume**: The agent code is located inside a multiline string in the  function in . This is where the changes need to be made.
+    -   **What will be achieved**: The agent will be able to perform more in-depth scans, detecting a wider range of vulnerabilities.
+    -   **Status**: NOT STARTED
+    -   **Should Test frontend/backend/both after fix?**: both
+    -   **Blocked on something**: None
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   (P0) Implement Reseller Login-as-Customer feature.
-    -   (P1) Create a Docker Compose file () to simplify the server deployment process.
+    -   (P0) **Enhance Agent Scanning Capabilities**: Implement the following features into the agent's scan logic:
+        1.  **SSL/TLS Control**: Use Nmap's  scripts to check for certificate validity, weak ciphers, and common SSL/TLS vulnerabilities.
+        2.  **Script Scanning**: Run Nmap's  script category () to actively check for known vulnerabilities.
+        3.  **Deeper Banner Grabbing**: Enhance service version detection.
+        4.  **Active Checks**: Add simple probes for common web vulnerabilities like SQLi, XSS, and LFI.
+    -   (P1) Implement Reseller Login-as-Customer feature.
+    -   (P2) Create a Docker Compose file () to simplify server deployment.
 -   **Future Tasks**:
-    -   (P0) Develop a lightweight Linux agent for local network scanning.
-    -   (P1) Integrate additional vulnerability sources like Exploit-DB and GitHub Advisories.
+    -   (P1) Integrate additional vulnerability sources like Exploit-DB and GitHub Advisories into the panel's analysis engine.
 
 **Completed work in this session**
--   **Architectural Refactor**:
-    -   Completed the implementation of scan **iterations**, allowing historical tracking of re-scans under a single scan object.
-    -   Implemented on-demand, **themed (light/dark)** report generation, removing the need to store report files on the server.
--   **Report Enhancements**:
-    -   Added a Tespit Edilen Portlar (Detected Ports) section to HTML/PDF reports.
-    -   Grouped vulnerabilities by target in reports for better readability.
-    -   Added target names to the headers of the port and vulnerability sections in reports.
--   **Bug Fixes and UI/UX Improvements**:
-    -   Fixed the Rescan button to correctly trigger a new iteration instead of redirecting.
-    -   Resolved an issue where vulnerabilities from older scans (without an  field) were not being displayed on the UI or in reports.
-    -   Added Low and Info severity statistics cards to the CVE Database page.
-    -   Corrected the CVE Database page to display statistics for all years, including future years like 2025 and 2026.
-    -   Removed the now-redundant CVE Sync tab from the Settings page.
-    -   Added comprehensive Turkish translations to the CVE Database page and updated button text as requested.
-    -   Implemented backend logic to save a  to the database when a scan fails.
+-   **Implemented: Agent-Based Scanning Architecture (Major Feature)**
+    -   Created a WebSocket gateway () for real-time, bidirectional communication between the panel and agents.
+    -   Added  and  models to .
+    -   Developed a dynamic  script, served via an API endpoint in , which contains the full Python agent code and sets it up as a  service.
+    -   Created a new Agent Management page ().
+    -   Refactored the New Scan () and  () logic to delegate all scan tasks to agents.
+    -   Centralized the vulnerability analysis logic on the panel backend (), with agents only providing raw Nmap data.
+-   **Fixed: CVE Reference Links in Reports**
+    -   Corrected the data parsing logic in  and  to handle the object structure of CVE references, ensuring they appear in reports.
+-   **Fixed: Scan Failure Reason in UI**
+    -   Completed the feature to store a  in the database (, ) and display it in an alert on the .
+-   **Fixed: Agent Logic Bugs**
+    -   Resolved an issue where the agent was not receiving the target IP address.
+    -   Corrected the  function, which was incorrectly running scans locally instead of using an agent.
+-   **Deployment Support**: Assisted the user in debugging their Nginx configuration to correctly proxy API and WebSocket traffic.
+
+**Earlier issues found/mentioned but not fixed**
+-   None. All raised issues were addressed.
+
+**Known issue recurrence from previous fork**
+-   The issue with CVE reference links missing from reports was a recurring problem. It has been definitively fixed by making the data processing functions in  and  robust enough to handle the data structure coming from the database.
 
 **Code Architecture**
-references
+
 
 **Key Technical Concepts**
--   **Backend**: FastAPI, MongoDB (), JWT,  for non-blocking I/O, 
+-   **Backend**: FastAPI, MongoDB (), JWT, , usage: websockets [--version | <uri>], 
 -----
 
 WeasyPrint could not import some external libraries. Please carefully follow the installation steps before reporting an issue:
 https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
 https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#troubleshooting 
 
------ for PDF, .
+-----, .
 -   **Frontend**: React, Tailwind CSS, Shadcn/UI, .
--   **Architecture**: Scan Iterations, On-Demand Reporting, Multi-layered scanning, Dynamic Risk Scoring.
+-   **Architecture**: **Agent-Based Scanning**, Scan Iterations, On-Demand Reporting, WebSocket Communication, Centralized Intelligence.
 
 **key DB schema**
 -   **User**: , , , .
--   **Scan**: , , , , , .
--   **Iteration (sub-doc in Scan)**: , , , , , .
+-   **Scan**: , , , , .
+-   **Agent**: uid=0(root) gid=0(root) groups=0(root), , ,  (hashed),  ('online'/'offline'), , .
+-   **AgentTask**: uid=0(root) gid=0(root) groups=0(root), , ,  ('pending'/'running'/'completed'), .
 -   **Vulnerability**: , , , , , .
--   **CVE**: , , , ,  (**This field is not being populated correctly**).
 
 **All files of reference**
--   : Core logic for iterations, on-demand reports, and scan failures.
--   : All report generation logic, including theming, port sections, and target grouping.
--   : Defines the database schemas for , , etc.
--   : **Contains the bug for the missing  field.**
--   : The Jinja2 template for all HTML reports.
--   : The main UI for viewing scan results, history, and downloading reports.
--   : UI for CVE statistics and search.
--   : UI for application settings.
--   : Stores global state and translations.
+-   : The heart of the new architecture. Contains Agent CRUD APIs, WebSocket registration, and the dynamic  script which holds the complete Python agent code.
+-   : Manages all WebSocket connections, dispatches tasks, and processes incoming scan results from agents.
+-   : Defines the schemas for  and .
+-   : The UI for creating, viewing, and managing agents.
+-   : The UI for starting a scan, which now requires selecting an online agent.
 
 **Critical Info for New Agent**
--   The top priority is to fix the missing CVE reference links in reports. The bug is in  where the  field is not being parsed from the NVD data feed. After fixing the code, a CVE sync must be run for the changes to take effect.
--   The second priority is to display the  for failed scans on the frontend . The backend logic for this is already complete.
--   The user is technical and provides clear, architectural feedback. Treat them as a collaborator.
+-   **The entire scanning architecture has been rebuilt.** Scans no longer run on the panel server. They are executed by remote Python agents.
+-   **The agent's source code is a multi-line string inside the  function in .** To modify the agent's behavior (e.g., add new scanning techniques), you must edit the Python code within that string.
+-   The panel and agents communicate over WebSockets.  handles the panel's side of this communication.
+-   The immediate next task is to enhance the agent's scanning capabilities as detailed in the Upcoming Tasks section. This will require modifying the agent's code in .
+
+**documents and test reports created in this job**
+-   /app/memory/PRD.md
+-   /app/test_reports/iteration_2.json
 
 **Last 10 User Messages and any pending HUMAN messages**
--   **User (346)**: Reports that CVE reference links (solutions) are still missing from the reports. (IN PROGRESS)
--   **User (335)**: Reports that Low and Info severity counts are missing from the CVE Database page. (COMPLETED)
--   **User (320)**: Suggests adding target names to the grouped findings in reports. (COMPLETED)
--   **User (307)**: Asks if findings in reports are grouped by target. (COMPLETED)
--   **User (268)**: Suggests adding a list of detected open ports to the reports. (COMPLETED)
--   **User (262)**: Asks what vulnerability data sources are currently being used. (ANSWERED)
--   **User (229)**: Reports missing Turkish translations on the CVE page and requests an update to a button's text. (COMPLETED)
--   **User (198)**: Asks to remove the CVE sync tab from the Settings page and to fix the year display on the CVE page. (COMPLETED)
--   **User (179)**: Asks how to see the logs for a failed scan. (COMPLETED -  added to DB, UI pending)
--   **User (168)**: Reports that HTML and PDF reports are empty (Zafiyet bulunamadı) even when vulnerabilities are visible on the page. (COMPLETED)
+10. **User**: Reports that agent scans run but find no vulnerabilities. **Agent**: Diagnosed that the analysis logic was incorrectly on the agent side and refactored the architecture to perform all analysis on the panel. (Completed)
+9.  **User**: Reports that the  sidebar link is not translated. **Agent**: Confirmed the translation exists in the code and advised the user to rebuild the frontend and clear cache. (Completed)
+8.  **User**: Reports that  still runs scans locally. **Agent**: Identified the oversight and updated the  function to use the new agent system. (Completed)
+7.  **User**: Reports their  URL is giving a 404 error. **Agent**: Helped the user debug their Nginx configuration, leading to a fix. (Completed)
+6.  **User**: Asks where the  file is located. **Agent**: Explained that it is not a physical file but is dynamically generated by an API endpoint in . (Completed)
+5.  **User**: Asks for the list of files to update for the agent system. **Agent**: Provided the list of new and modified files. (Completed)
+4.  **User**: States that all scans must run via agents and that Faz 3 & 4 of the plan should be completed. **Agent**: Implemented the required changes. (Completed)
+3.  **User**: Asks why the  field is needed for an agent. **Agent**: Agreed it was unnecessary and removed it from the backend and frontend. (Completed)
+2.  **User**: Asks for a summary of the current scanning logic. **Agent**: Provided a detailed breakdown of the new agent-based architecture. (Completed)
+1.  **User**: Approves the new architecture and requests adding more advanced scanning capabilities (SSL/TLS checks, Active Checks, NSE scripts). **Agent**: Agreed to the plan. (This is the **current task**).
 
 **Project Health Check:**
--   **Broken**: The functionality to include CVE reference links in reports is not working due to a data ingestion bug.
+-   **Broken**: None.
 -   **Mocked**: N/A
 
 **3rd Party Integrations**
 -   **NVD (National Vulnerability Database)** — Used for fetching CVE information.
 -   **CISA KEV (Known Exploited Vulnerabilities Catalog)** - Used for enriching CVEs with real-world exploit data.
--   **Nmap** — Command-line tool for network scanning.
+-   **Nmap** — Command-line tool for network scanning, executed by remote agents.
 
 **Testing status**
--   **Testing agent used after significant changes**: YES, the agent was used to validate the major architectural refactor of scan iterations and on-demand reporting.
+-   **Testing agent used after significant changes**: YES
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: []
--   **Known regressions**: None. The bugs reported by the user after the test run have either been fixed or are documented as pending issues.
+-   **Known regressions**: None.
 
 **Credentials to test flow:**
 -   **Email**: 
 -   **Password**: 
 
 **What agent forgot to execute**
--   The agent identified the bug in  for missing CVE references but did not implement the code change to fix it.
--   The agent implemented the backend logic to store a  for scans but forgot to add the corresponding UI on the frontend () to display this information to the user.</analysis>
+-   Initially, the agent overlooked updating the  function to use the new agent architecture, which the user later pointed out. This was corrected.
+-   The first implementation of the agent had a significant architectural flaw (analysis logic was on the agent). This was corrected after user feedback, leading to a more robust and correct architecture.</analysis>
