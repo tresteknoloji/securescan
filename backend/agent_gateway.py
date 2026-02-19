@@ -160,10 +160,12 @@ class AgentGateway:
                     "os_info": message.get("os_info"),
                     "installed_tools": message.get("installed_tools", []),
                     "agent_version": message.get("agent_version"),
-                    "internal_networks": message.get("detected_networks", [])
+                    "internal_networks": message.get("detected_networks", []),
+                    "ip_address": message.get("ip_address"),
+                    "hostname": message.get("hostname")
                 }}
             )
-            logger.info(f"Agent {agent_id} system info updated")
+            logger.info(f"Agent {agent_id} system info updated (IP: {message.get('ip_address')})")
         
         elif msg_type == "task_started":
             # Agent started executing a task
