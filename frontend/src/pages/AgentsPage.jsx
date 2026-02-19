@@ -353,15 +353,9 @@ export default function AgentsPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {agent.installed_tools?.map((tool, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs">
-                          {tool}
-                        </Badge>
-                      ))}
-                      {(!agent.installed_tools || agent.installed_tools.length === 0) && (
-                        <span className="text-muted-foreground text-xs">-</span>
-                      )}
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(agent.created_at)}
                     </div>
                   </TableCell>
                   <TableCell>
