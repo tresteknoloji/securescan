@@ -578,13 +578,13 @@ export default function NewScanPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={submitting || selectedTargets.length === 0}
+                disabled={submitting || selectedTargets.length === 0 || !selectedAgent || !hasOnlineAgent}
                 data-testid="start-scan-btn"
               >
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 spinner" />
-                    Starting...
+                    {language === 'tr' ? 'Başlatılıyor...' : 'Starting...'}
                   </>
                 ) : (
                   <>
