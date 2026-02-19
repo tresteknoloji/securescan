@@ -100,9 +100,10 @@ class AgentGateway:
             # Message loop
             while True:
                 try:
+                    # Extended timeout for long-running scans
                     data = await asyncio.wait_for(
                         websocket.receive_text(),
-                        timeout=self.heartbeat_interval * 2
+                        timeout=self.heartbeat_interval * 3  # 3 minutes before timeout
                     )
                     await self.handle_message(agent_id, json.loads(data))
                 except asyncio.TimeoutError:
