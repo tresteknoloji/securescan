@@ -913,7 +913,7 @@ class AgentGateway:
                             # Very likely already patched via backport
                             confidence = "unlikely"
                             severity_note = f" (CVE from {cve_year}, likely patched on {distro_name})"
-                    except:
+                    except Exception:
                         pass
             
             # Get base severity from CVSS
