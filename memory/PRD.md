@@ -146,6 +146,32 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - ✅ Servis bazlı zafiyet kontrolü
 - ✅ CVE eşleştirme
 
+### Agent Sistemi (2026-02-17) - ✅ TAMAMLANDI
+
+#### Faz 1: Backend - Agent Gateway & API
+- ✅ Agent modelleri oluşturuldu (`Agent`, `AgentTask`, `AgentResponse`, vb.)
+- ✅ WebSocket Gateway implementasyonu (`agent_gateway.py`)
+- ✅ Agent CRUD API endpoint'leri (`/api/agents`)
+- ✅ Token tabanlı kimlik doğrulama (kalıcı token, hash ile saklama)
+- ✅ Agent komut gönderme endpoint'i (`/api/agents/{id}/send-command`)
+- ✅ Install script endpoint'i (`/api/agent/install.sh`)
+
+#### Faz 2: Frontend - Agent Yönetim Sayfası
+- ✅ `AgentsPage.jsx` oluşturuldu
+- ✅ Agent listesi tablosu (durum, ağlar, araçlar, son görülme)
+- ✅ Yeni agent oluşturma diyaloğu
+- ✅ Token/kurulum komutu gösterme diyaloğu
+- ✅ Agent silme işlevi
+- ✅ Sidebar'a "Agentlar" linki eklendi
+- ✅ Türkçe/İngilizce çeviri desteği
+
+#### Agent Özellikleri
+- WebSocket ile gerçek zamanlı iletişim
+- Kalıcı token (her bağlantıda doğrulama gerekmez)
+- Otomatik araç kurulumu (nmap, masscan)
+- Sistem bilgisi toplama
+- Tarama sonuçları işleme
+
 ### Düzeltmeler (2026-02-17) - ✅ TAMAMLANDI
 
 #### CVE Referansları Raporda Görünmeme Hatası
