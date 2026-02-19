@@ -471,11 +471,9 @@ class Agent(BaseModel):
 
 class AgentCreate(BaseModel):
     name: str
-    internal_networks: List[str] = Field(default_factory=list)
 
 class AgentUpdate(BaseModel):
     name: Optional[str] = None
-    internal_networks: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
 class AgentResponse(BaseModel):
