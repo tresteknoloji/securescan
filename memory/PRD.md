@@ -218,6 +218,32 @@ Agent artık temel port taramasının ötesinde kapsamlı güvenlik kontrolleri 
 - **Evidence Alanı**: Bulguların teknik kanıtları gösteriliyor
 - **Vulnerability Model**: `evidence`, `is_kev`, `source` alanları eklendi
 
+### CVE Version Range Matching (2026-02-19) - ✅ TAMAMLANDI
+
+CVE eşleştirmesi artık doğru versiyon aralığı kontrolü yapıyor:
+
+#### Problem
+- Önceki sistem sadece ürün adına göre CVE arıyordu
+- OpenSSH 9.6p1 için CVE-2001-1459 (sadece 2.9 ve öncesi için geçerli) false positive olarak raporlanıyordu
+
+#### Çözüm
+- **Semantic Version Parsing**: `_parse_version()` - "9.6p1" → (9, 6, 1) tuple
+- **Version Range Matching**: `_version_in_range()` - "<= 2.9", "7.0 - 8.8" gibi aralıklar
+- **CVE Description Parsing**: `_extract_affected_versions()` - CVE açıklamasından etkilenen versiyonları çıkarma
+- **Smart Filtering**: `_is_relevant_cve()` - Yanlış ürün eşleşmelerini filtreleme
+
+#### Desteklenen Formatlar
+- `"<= 2.9"` veya `"< 2.9"`
+- `"before 2.9"` veya `"through 2.9"`
+- `"2.9 and earlier"`
+- `"7.0 - 8.8"` veya `"7.0 to 8.8"`
+- `"7.x"` (herhangi minor versiyon)
+
+#### Test Sonuçları
+- OpenSSH 9.6p1 vs CVE-2001-1459 (affects <= 2.9): ✓ DOĞRU - Etkilenmiyor
+- Apache 2.4.52 vs CVE (affects 2.4.0 - 2.4.51): ✓ DOĞRU - Etkilenmiyor
+- Apache 2.4.50 vs CVE (affects 2.4.0 - 2.4.51): ✓ DOĞRU - Etkileniyor
+
 ### Düzeltmeler (2026-02-17) - ✅ TAMAMLANDI
 
 #### CVE Referansları Raporda Görünmeme Hatası
