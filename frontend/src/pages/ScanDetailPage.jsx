@@ -34,6 +34,9 @@ import {
   Sun,
   Moon,
   Download,
+  Lock,
+  Code,
+  Globe,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
