@@ -1921,13 +1921,12 @@ class SecureScanAgent:
                 
                 logger.info(f"Phase 2 - SSL Scan: {{ssl_cmd}}")
                 
-                process = await asyncio.create_subprocess_shell(
-                    ssl_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await process.communicate()
-                ssl_output = stdout.decode()
+                try:
+                    ssl_stdout, ssl_stderr = await self.run_command_with_heartbeat(ssl_cmd, task_id, timeout=120)
+                    ssl_output = ssl_stdout
+                except asyncio.TimeoutError:
+                    logger.warning(f"SSL scan timeout for {{target}}")
+                    ssl_output = ""
                 
                 # Parse SSL findings
                 ssl_findings = self.parse_ssl_findings(ssl_output, target)
@@ -1943,13 +1942,8 @@ class SecureScanAgent:
             logger.info(f"Phase 3 - NSE Vuln Scan: {{nse_cmd}}")
             
             try:
-                process = await asyncio.create_subprocess_shell(
-                    nse_cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
-                nse_output = stdout.decode()
+                nse_stdout, nse_stderr = await self.run_command_with_heartbeat(nse_cmd, task_id, timeout=300)
+                nse_output = nse_stdout
                 
                 # Parse NSE findings
                 nse_findings = self.parse_nse_findings(nse_output, target)
