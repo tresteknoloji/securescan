@@ -905,23 +905,39 @@ class AgentGateway:
         
         affected = []
         
+        # Product-specific aliases
+        product_aliases = {
+            'apache': r'(?:apache(?:\s+http\s+server)?|httpd)',
+            'openssh': r'openssh',
+            'nginx': r'nginx',
+            'mysql': r'mysql',
+            'postgresql': r'postgres(?:ql)?',
+        }
+        
+        product_pattern = product_aliases.get(product.lower(), re.escape(product))
+        
         # Common patterns for version ranges in CVE descriptions
         patterns = [
-            # "OpenSSH before 8.9"
-            rf'{product}\s+(?:versions?\s+)?before\s+([\d.p]+)',
-            # "OpenSSH through 8.9" or "OpenSSH 8.9 and earlier"
-            rf'{product}\s+(?:versions?\s+)?(?:through|up to)\s+([\d.p]+)',
-            rf'{product}\s+([\d.p]+)\s+and\s+(?:earlier|before|prior)',
-            # "OpenSSH < 8.9" or "OpenSSH <= 8.9"
-            rf'{product}\s+<\s*=?\s*([\d.p]+)',
-            # "OpenSSH 7.x"
-            rf'{product}\s+([\d]+\.x)',
-            # "OpenSSH 7.0 to 8.9"
-            rf'{product}\s+([\d.p]+)\s+(?:to|-)\s+([\d.p]+)',
-            # "in OpenSSH 8.9"
-            rf'in\s+{product}\s+([\d.p]+)',
-            # "affects OpenSSH 8.9"
-            rf'affects?\s+{product}\s+([\d.p]+)',
+            # "Product before 8.9"
+            rf'{product_pattern}\s+(?:versions?\s+)?before\s+([\d.p]+)',
+            # "Product through 8.9" or "Product up to 8.9"
+            rf'{product_pattern}\s+(?:versions?\s+)?(?:through|up to)\s+([\d.p]+)',
+            # "Product 8.9 and earlier"
+            rf'{product_pattern}\s+([\d.p]+)\s+and\s+(?:earlier|before|prior)',
+            # "Product < 8.9" or "Product <= 8.9"
+            rf'{product_pattern}\s+<\s*=?\s*([\d.p]+)',
+            # "Product 7.x"
+            rf'{product_pattern}\s+([\d]+\.x)',
+            # "Product 7.0 to 8.9" or "Product 7.0 - 8.9"
+            rf'{product_pattern}\s+([\d.]+)\s+(?:to|-)\s+([\d.]+)',
+            # "in Product 8.9"
+            rf'in\s+{product_pattern}\s+([\d.p]+)',
+            # "affects Product 8.9"
+            rf'affects?\s+{product_pattern}\s+([\d.p]+)',
+            # "Product version 8.9"
+            rf'{product_pattern}\s+version\s+([\d.p]+)',
+            # Specific patterns for "X.Y.Z to A.B.C" without product prefix
+            rf'([\d]+\.[\d]+\.[\d]+)\s+to\s+([\d]+\.[\d]+\.[\d]+)',
         ]
         
         for pattern in patterns:
@@ -933,7 +949,7 @@ class AgentGateway:
                 else:
                     # Single version or "before X"
                     # Check context for "before/through" keywords
-                    if 'before' in pattern or 'through' in pattern or '<' in pattern:
+                    if 'before' in pattern or 'through' in pattern or '<' in pattern or 'up to' in pattern:
                         affected.append(f"<= {match}")
                     elif 'earlier' in pattern or 'prior' in pattern:
                         affected.append(f"<= {match}")
