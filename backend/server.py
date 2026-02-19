@@ -1948,7 +1948,7 @@ class SecureScanAgent:
             logger.info(f"Phase 3 - NSE Scan: {{nse_cmd}}")
             
             try:
-                nse_stdout, nse_stderr = await self.run_command_with_heartbeat(nse_cmd, task_id, timeout=300)
+                nse_stdout, nse_stderr = await self.run_command_with_heartbeat(nse_cmd, task_id, timeout=120)
                 nse_output = nse_stdout
                 
                 # Parse NSE findings
