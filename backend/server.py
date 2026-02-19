@@ -1297,11 +1297,11 @@ async def list_agents(current_user: dict = Depends(get_current_user)):
     """List agents for current user (customers see their agents, admins see all)"""
     query = {}
     if current_user["role"] == "customer":
-        query["customer_id"] = current_user["id"]
+        query["customer_id"] = current_user["sub"]
     elif current_user["role"] == "reseller":
         # Resellers see their own agents and their customers' agents
-        customer_ids = await db.users.distinct("id", {"parent_id": current_user["id"]})
-        query["customer_id"] = {"$in": [current_user["id"]] + customer_ids}
+        customer_ids = await db.users.distinct("id", {"parent_id": current_user["sub"]})
+        query["customer_id"] = {"$in": [current_user["sub"]] + customer_ids}
     
     agents = await db.agents.find(query, {"_id": 0, "token": 0}).to_list(100)
     
