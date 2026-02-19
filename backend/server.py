@@ -871,7 +871,7 @@ async def download_report_direct(
     
     try:
         current_user = decode_token(token)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
     return await _generate_report(scan_id, format, iteration, theme, current_user)
