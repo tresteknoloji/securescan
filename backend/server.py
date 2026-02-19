@@ -2023,51 +2023,161 @@ class SecureScanAgent:
         return findings
     
     def parse_nse_findings(self, output: str, target: str):
-        """Parse NSE vulnerability script output"""
+        """
+        Parse NSE vulnerability script output with proper filtering.
+        - Filters out ERROR/failed script outputs
+        - Exploit references are informational only
+        - Requires actual VULNERABLE state confirmation
+        """
         findings = []
         current_port = None
-        current_vuln = None
         
         lines = output.split("\\n")
         
-        vuln_keywords = [
-            "VULNERABLE", "CVE-", "MS17-", "MS08-", "MS12-", "MS15-",
-            "exploit", "Exploitable", "vulnerable", "backdoor", 
-            "anonymous", "weak password", "default password",
-            "authentication bypass", "remote code execution"
+        # Lines to skip - these are NOT vulnerabilities
+        SKIP_PATTERNS = [
+            "ERROR: Script execution failed",
+            "ERROR:",
+            "TIMEOUT",
+            "timed out",
+            "Could not",
+            "Unable to",
+            "Connection refused",
+            "No route to host",
+            "failed to",
+            "not vulnerable",
+            "NOT VULNERABLE",
+            "State: NOT VULNERABLE",
         ]
         
-        for i, line in enumerate(lines):
-            import re
+        # Patterns that indicate CONFIRMED vulnerability (Nmap says VULNERABLE)
+        CONFIRMED_VULN_PATTERNS = [
+            "State: VULNERABLE",
+            "VULNERABLE:",
+            "IS VULNERABLE",
+        ]
+        
+        # Exploit reference patterns (informational only, not severity boost)
+        EXPLOIT_REF_PATTERNS = [
+            "exploit-db.com",
+            "packetstormsecurity",
+            "github.com",
+            "rapid7",
+            "metasploit",
+        ]
+        
+        import re
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i]
             
             # Get port context
             port_match = re.search(r"(\\d+)/tcp", line)
             if port_match:
                 current_port = int(port_match.group(1))
             
-            # Check for vulnerability indicators
-            for keyword in vuln_keywords:
-                if keyword.lower() in line.lower():
-                    # Extract CVE if present
-                    cve_match = re.search(r"(CVE-\\d{{4}}-\\d{{4,}})", line, re.IGNORECASE)
-                    cve_id = cve_match.group(1).upper() if cve_match else None
-                    
-                    # Determine severity
-                    if "critical" in line.lower() or "remote code execution" in line.lower():
-                        severity = "critical"
-                    elif "VULNERABLE" in line or "exploit" in line.lower():
-                        severity = "high"
-                    elif "weak" in line.lower() or "default" in line.lower():
-                        severity = "medium"
+            # Skip error/failed lines - these are NOT vulnerabilities
+            should_skip = False
+            for skip_pattern in SKIP_PATTERNS:
+                if skip_pattern.lower() in line.lower():
+                    should_skip = True
+                    break
+            
+            if should_skip:
+                i += 1
+                continue
+            
+            # Check for CONFIRMED VULNERABLE state
+            is_confirmed = False
+            for vuln_pattern in CONFIRMED_VULN_PATTERNS:
+                if vuln_pattern in line:
+                    is_confirmed = True
+                    break
+            
+            # Extract CVE if present
+            cve_match = re.search(r"(CVE-\\d{{4}}-\\d{{4,}})", line, re.IGNORECASE)
+            cve_id = cve_match.group(1).upper() if cve_match else None
+            
+            # Check for specific NSE vulnerability scripts with VULNERABLE state
+            if is_confirmed:
+                # Look for script name and details
+                script_match = re.search(r"\\|\\s*(\\S+-vuln-\\S+):", line) or re.search(r"(smb-vuln-\\S+|http-vuln-\\S+)", line)
+                script_name = script_match.group(1) if script_match else "NSE Vulnerability"
+                
+                # Collect description from following lines
+                description_lines = [line.strip()]
+                for j in range(1, min(10, len(lines) - i)):
+                    next_line = lines[i + j].strip()
+                    if next_line.startswith("|") or next_line.startswith("  "):
+                        description_lines.append(next_line.lstrip("| "))
                     else:
-                        severity = "medium"
-                    
-                    # Get title from script name or CVE
-                    title = cve_id if cve_id else f"Vulnerability Found: {{keyword}}"
-                    
-                    # Look for description in next few lines
-                    description = line.strip()
-                    for j in range(1, min(4, len(lines) - i)):
+                        break
+                
+                description = " ".join(description_lines)[:500]
+                
+                # Determine severity based on actual vulnerability
+                if "remote code execution" in description.lower() or "rce" in description.lower():
+                    severity = "critical"
+                    confidence = "confirmed"
+                elif "ms17-010" in line.lower() or "eternalblue" in line.lower():
+                    severity = "critical"
+                    confidence = "confirmed"
+                elif "ms08-067" in line.lower():
+                    severity = "critical"
+                    confidence = "confirmed"
+                elif cve_id:
+                    severity = "high"
+                    confidence = "confirmed"
+                else:
+                    severity = "medium"
+                    confidence = "confirmed"
+                
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "nse",
+                    "confidence": confidence,
+                    "severity": severity,
+                    "title": f"{{cve_id or script_name}} - CONFIRMED VULNERABLE",
+                    "description": description,
+                    "cve_id": cve_id,
+                    "evidence": line.strip()
+                }})
+            
+            # Check for exploit references - these are INFORMATIONAL only
+            elif any(ref in line.lower() for ref in EXPLOIT_REF_PATTERNS):
+                # Extract URL
+                url_match = re.search(r"(https?://\\S+)", line)
+                url = url_match.group(1) if url_match else line.strip()
+                
+                findings.append({{
+                    "target": target,
+                    "port": current_port,
+                    "type": "nse",
+                    "confidence": "informational",
+                    "severity": "info",  # NOT high - just reference
+                    "title": "Exploit Reference Found",
+                    "description": f"Public exploit reference found. Does NOT confirm exploitability.",
+                    "evidence": url[:200]
+                }})
+            
+            # Check for FTP anonymous (confirmed by actual check)
+            elif "ftp-anon" in line.lower() and "anonymous ftp login allowed" in line.lower():
+                findings.append({{
+                    "target": target,
+                    "port": current_port or 21,
+                    "type": "nse",
+                    "confidence": "confirmed",
+                    "severity": "medium",  # Downgraded from high - anonymous FTP is common
+                    "title": "Anonymous FTP Login Allowed",
+                    "description": "FTP server allows anonymous login. Check for sensitive files.",
+                    "evidence": line.strip()
+                }})
+            
+            i += 1
+        
+        return findings
                         if lines[i + j].strip() and not lines[i + j].strip().startswith("|"):
                             break
                         description += " " + lines[i + j].strip()
