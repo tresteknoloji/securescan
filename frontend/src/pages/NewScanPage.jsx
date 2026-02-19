@@ -15,6 +15,11 @@ import {
 } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '../components/ui/alert';
+import {
   Radar,
   Target,
   Settings,
@@ -27,6 +32,10 @@ import {
   Shield,
   Lock,
   Search,
+  HardDrive,
+  AlertTriangle,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
