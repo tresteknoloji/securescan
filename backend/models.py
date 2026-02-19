@@ -497,7 +497,6 @@ class AgentWithToken(BaseModel):
     name: str
     token: str  # Plain token - only returned on creation
     status: AgentStatusType
-    internal_networks: List[str] = []
     is_active: bool
     created_at: datetime
     install_command: str  # Ready-to-use installation command
