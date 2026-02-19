@@ -2121,113 +2121,261 @@ class SecureScanAgent:
         return findings
     
     async def run_web_checks(self, target: str, ports: list, task_id: str):
-        """Run active web vulnerability checks"""
+        """
+        Run active web vulnerability checks with proper validation.
+        Uses multi-step verification to avoid false positives.
+        Implements confidence scoring: possible / likely / confirmed
+        """
         findings = []
         
         import urllib.request
         import urllib.error
+        import time
+        
+        # SQL Error patterns for different databases
+        SQL_ERROR_PATTERNS = [
+            # MySQL
+            r"you have an error in your sql syntax",
+            r"warning.*mysql",
+            r"mysql_fetch",
+            r"mysql_num_rows",
+            r"mysql_query",
+            r"mysqli_",
+            # PostgreSQL
+            r"pg_query",
+            r"pg_exec",
+            r"postgresql.*error",
+            r"psql.*error",
+            r"unterminated quoted string",
+            # MSSQL
+            r"microsoft sql server",
+            r"odbc sql server driver",
+            r"sql server.*error",
+            r"unclosed quotation mark",
+            r"mssql_query",
+            # Oracle
+            r"ora-\d{{5}}",
+            r"oracle.*error",
+            r"oracle.*driver",
+            # SQLite
+            r"sqlite.*error",
+            r"sqlite3_",
+            # Generic
+            r"sql syntax.*error",
+            r"syntax error.*sql",
+            r"unexpected end of sql",
+            r"invalid query",
+            r"sql command not properly ended",
+        ]
         
         for port in ports[:3]:  # Limit to 3 ports
             protocol = "https" if port in [443, 8443, 4443] else "http"
             base_url = f"{{protocol}}://{{target}}:{{port}}"
             
-            # Test payloads for common vulnerabilities
-            tests = [
-                # SQL Injection test
-                {{
-                    "name": "SQL Injection",
-                    "paths": ["/login?id=1'", "/search?q=test'", "/user?id=1 OR 1=1"],
-                    "indicators": ["sql", "syntax", "mysql", "postgresql", "oracle", "sqlite", "odbc", "query"],
-                    "severity": "critical"
-                }},
-                # XSS test
-                {{
-                    "name": "Reflected XSS",
-                    "paths": ["/search?q=<script>alert(1)</script>", "/?name=<img src=x onerror=alert(1)>"],
-                    "indicators": ["<script>alert(1)</script>", "<img src=x"],
-                    "severity": "high"
-                }},
-                # LFI test
-                {{
-                    "name": "Local File Inclusion",
-                    "paths": ["/page?file=../../../etc/passwd", "/view?path=....//....//etc/passwd"],
-                    "indicators": ["root:", "/bin/bash", "daemon:", "nobody:"],
-                    "severity": "critical"
-                }},
-                # Directory traversal
-                {{
-                    "name": "Directory Traversal",
-                    "paths": ["/static/../../../etc/passwd", "/images/..%2f..%2f..%2fetc/passwd"],
-                    "indicators": ["root:", "/bin/bash", "daemon:"],
-                    "severity": "critical"
-                }},
-                # Common sensitive files
-                {{
-                    "name": "Sensitive File Exposure",
-                    "paths": ["/.env", "/.git/config", "/config.php.bak", "/web.config", "/wp-config.php.bak"],
-                    "indicators": ["password", "secret", "api_key", "database", "[core]", "repositoryformatversion"],
-                    "severity": "high"
-                }},
-                # Admin panels
-                {{
-                    "name": "Admin Panel Exposed",
-                    "paths": ["/admin", "/administrator", "/phpmyadmin", "/wp-admin"],
-                    "indicators": ["login", "password", "admin", "dashboard"],
-                    "severity": "medium",
-                    "check_status": True
-                }}
+            import ssl
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            # === SQL Injection Testing with Multi-Step Validation ===
+            sqli_paths = [
+                ("/login", "id", "1"),
+                ("/search", "q", "test"),
+                ("/user", "id", "1"),
+                ("/api/user", "id", "1"),
+                ("/product", "id", "1"),
             ]
             
-            for test in tests:
-                for path in test["paths"]:
+            for path, param, value in sqli_paths:
+                try:
+                    # Step 1: Get baseline response
+                    baseline_url = f"{{base_url}}{{path}}?{{param}}={{value}}"
+                    req = urllib.request.Request(baseline_url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
                     try:
-                        url = f"{{base_url}}{{path}}"
-                        req = urllib.request.Request(
-                            url, 
-                            headers={{"User-Agent": "SecureScan-Agent/1.0"}}
-                        )
-                        
-                        # Use shorter timeout
-                        import ssl
-                        ctx = ssl.create_default_context()
-                        ctx.check_hostname = False
-                        ctx.verify_mode = ssl.CERT_NONE
+                        baseline_resp = urllib.request.urlopen(req, timeout=5, context=ctx)
+                        baseline_content = baseline_resp.read().decode('utf-8', errors='ignore')
+                        baseline_len = len(baseline_content)
+                    except:
+                        continue
+                    
+                    # Step 2: Test with SQL injection payload
+                    sqli_url = f"{{base_url}}{{path}}?{{param}}={{value}}'"
+                    req = urllib.request.Request(sqli_url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                    
+                    try:
+                        sqli_resp = urllib.request.urlopen(req, timeout=5, context=ctx)
+                        sqli_content = sqli_resp.read().decode('utf-8', errors='ignore').lower()
+                        sqli_status = sqli_resp.getcode()
+                    except urllib.error.HTTPError as e:
+                        sqli_content = e.read().decode('utf-8', errors='ignore').lower() if e.fp else ""
+                        sqli_status = e.code
+                    
+                    # Check for SQL error patterns (REAL SQLi indicator)
+                    import re
+                    sql_error_found = False
+                    matched_pattern = None
+                    for pattern in SQL_ERROR_PATTERNS:
+                        if re.search(pattern, sqli_content, re.IGNORECASE):
+                            sql_error_found = True
+                            matched_pattern = pattern
+                            break
+                    
+                    if sql_error_found:
+                        # CONFIRMED: SQL error message in response
+                        findings.append({{
+                            "target": target,
+                            "port": port,
+                            "type": "web",
+                            "confidence": "confirmed",
+                            "severity": "critical",
+                            "title": "SQL Injection (Error-Based) - CONFIRMED",
+                            "description": f"SQL error message detected in response. Database error pattern matched.",
+                            "evidence": f"URL: {{sqli_url}} | Pattern: {{matched_pattern}}"
+                        }})
+                    elif sqli_status == 500 and baseline_resp.getcode() == 200:
+                        # Step 3: Boolean-based test for LIKELY
+                        true_url = f"{{base_url}}{{path}}?{{param}}={{value}}' OR '1'='1"
+                        false_url = f"{{base_url}}{{path}}?{{param}}={{value}}' AND '1'='2"
                         
                         try:
-                            response = urllib.request.urlopen(req, timeout=5, context=ctx)
-                            content = response.read().decode('utf-8', errors='ignore').lower()
-                            status = response.getcode()
+                            true_req = urllib.request.Request(true_url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                            true_resp = urllib.request.urlopen(true_req, timeout=5, context=ctx)
+                            true_len = len(true_resp.read())
                             
-                            # Check for vulnerability indicators
-                            for indicator in test["indicators"]:
-                                if indicator.lower() in content:
-                                    findings.append({{
-                                        "target": target,
-                                        "port": port,
-                                        "type": "web",
-                                        "severity": test["severity"],
-                                        "title": f"{{test['name']}} Possible",
-                                        "description": f"Possible {{test['name']}} vulnerability detected at {{path}}",
-                                        "evidence": f"URL: {{url}} | Indicator: {{indicator}} found in response"
-                                    }})
-                                    break
+                            false_req = urllib.request.Request(false_url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                            false_resp = urllib.request.urlopen(false_req, timeout=5, context=ctx)
+                            false_len = len(false_resp.read())
                             
-                            # Check for accessible admin panels (status 200)
-                            if test.get("check_status") and status == 200:
+                            # Significant difference suggests boolean-based SQLi
+                            if abs(true_len - false_len) > 100 and true_len > baseline_len * 0.5:
                                 findings.append({{
                                     "target": target,
                                     "port": port,
                                     "type": "web",
-                                    "severity": test["severity"],
-                                    "title": f"{{test['name']}}",
-                                    "description": f"{{path}} is accessible (HTTP 200)",
-                                    "evidence": f"URL: {{url}} returned HTTP {{status}}"
+                                    "confidence": "likely",
+                                    "severity": "high",
+                                    "title": "SQL Injection (Boolean-Based) - LIKELY",
+                                    "description": f"Boolean-based SQLi pattern detected. Response varies with true/false conditions.",
+                                    "evidence": f"URL: {{path}} | True len: {{true_len}}, False len: {{false_len}}, Baseline: {{baseline_len}}"
                                 }})
-                                break
+                        except:
+                            # If boolean test fails, report as possible
+                            findings.append({{
+                                "target": target,
+                                "port": port,
+                                "type": "web",
+                                "confidence": "possible",
+                                "severity": "medium",
+                                "title": "SQL Injection - POSSIBLE",
+                                "description": f"Server returned 500 error with SQL payload. Manual verification required.",
+                                "evidence": f"URL: {{sqli_url}} returned HTTP 500"
+                            }})
                             
-                        except urllib.error.HTTPError as e:
-                            # Some errors also indicate vulnerabilities
-                            if e.code == 500:
+                except Exception as e:
+                    pass
+            
+            # === LFI/Directory Traversal Testing ===
+            lfi_tests = [
+                ("/page?file=../../../etc/passwd", ["root:", "daemon:", "nobody:", "/bin/bash", "/sbin/nologin"]),
+                ("/view?path=....//....//etc/passwd", ["root:", "daemon:", "nobody:"]),
+                ("/include?page=../../../etc/passwd", ["root:", "/bin/bash"]),
+            ]
+            
+            for path, indicators in lfi_tests:
+                try:
+                    url = f"{{base_url}}{{path}}"
+                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                    resp = urllib.request.urlopen(req, timeout=5, context=ctx)
+                    content = resp.read().decode('utf-8', errors='ignore')
+                    
+                    # Must match multiple indicators to confirm
+                    matches = sum(1 for ind in indicators if ind in content)
+                    
+                    if matches >= 3:
+                        findings.append({{
+                            "target": target,
+                            "port": port,
+                            "type": "web",
+                            "confidence": "confirmed",
+                            "severity": "critical",
+                            "title": "Local File Inclusion - CONFIRMED",
+                            "description": "/etc/passwd content detected in response.",
+                            "evidence": f"URL: {{url}} | Matched {{matches}} passwd indicators"
+                        }})
+                    elif matches >= 1:
+                        findings.append({{
+                            "target": target,
+                            "port": port,
+                            "type": "web",
+                            "confidence": "possible",
+                            "severity": "medium",
+                            "title": "Local File Inclusion - POSSIBLE",
+                            "description": "Partial passwd-like content in response. May be false positive.",
+                            "evidence": f"URL: {{url}} | Matched {{matches}} indicator(s)"
+                        }})
+                except:
+                    pass
+            
+            # === Sensitive File Exposure (requires actual content validation) ===
+            sensitive_files = [
+                ("/.env", ["DB_PASSWORD", "SECRET_KEY", "API_KEY", "DATABASE_URL", "MYSQL_PASSWORD"]),
+                ("/.git/config", ["[core]", "[remote", "repositoryformatversion", "url ="]),
+                ("/config.php.bak", ["<?php", "password", "mysql_connect", "mysqli"]),
+                ("/web.config", ["<configuration>", "connectionString", "appSettings"]),
+            ]
+            
+            for path, indicators in sensitive_files:
+                try:
+                    url = f"{{base_url}}{{path}}"
+                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                    resp = urllib.request.urlopen(req, timeout=5, context=ctx)
+                    content = resp.read().decode('utf-8', errors='ignore')
+                    status = resp.getcode()
+                    
+                    if status == 200:
+                        matches = sum(1 for ind in indicators if ind.lower() in content.lower())
+                        
+                        if matches >= 2:
+                            findings.append({{
+                                "target": target,
+                                "port": port,
+                                "type": "web",
+                                "confidence": "confirmed",
+                                "severity": "high",
+                                "title": f"Sensitive File Exposed: {{path}}",
+                                "description": f"Sensitive configuration file accessible. Contains {{matches}} sensitive patterns.",
+                                "evidence": f"URL: {{url}} | HTTP 200 with config content"
+                            }})
+                except urllib.error.HTTPError:
+                    pass
+                except:
+                    pass
+            
+            # === Admin Panel Detection (informational, not critical) ===
+            admin_paths = ["/admin", "/administrator", "/phpmyadmin", "/wp-admin", "/wp-login.php"]
+            
+            for path in admin_paths:
+                try:
+                    url = f"{{base_url}}{{path}}"
+                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan-Agent/1.0.3"}})
+                    resp = urllib.request.urlopen(req, timeout=5, context=ctx)
+                    status = resp.getcode()
+                    
+                    if status == 200:
+                        findings.append({{
+                            "target": target,
+                            "port": port,
+                            "type": "web",
+                            "confidence": "confirmed",
+                            "severity": "info",  # Downgraded - just informational
+                            "title": f"Admin Panel Found: {{path}}",
+                            "description": f"Admin panel accessible at {{path}}. Ensure strong authentication.",
+                            "evidence": f"URL: {{url}} | HTTP 200"
+                        }})
+                except:
+                    pass
+        
+        return findings
                                 error_content = e.read().decode('utf-8', errors='ignore').lower()
                                 for indicator in test["indicators"]:
                                     if indicator.lower() in error_content:
