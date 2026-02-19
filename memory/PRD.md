@@ -206,12 +206,19 @@ Nessus tarzı profesyonel zafiyet tarama paneli. IP, domain ve prefix tarama des
 - [x] CVE referansları raporda görünmüyor - ✅ Düzeltildi (2026-02-17)
 - [x] Başarısız tarama nedeni UI'da gösterilmiyor - ✅ Düzeltildi (2026-02-17)
 - [x] Agent Sistemi Faz 1 & 2 - ✅ Tamamlandı (2026-02-17)
-- [ ] Agent Sistemi Faz 3 & 4 - Tarama entegrasyonu (Agent üzerinden tarama başlatma)
+- [x] Agent tabanlı tarama mimarisi - ✅ Tamamlandı (2026-02-18)
+- [x] **Gelişmiş Agent Tarama Yetenekleri - ✅ Tamamlandı (2026-02-19)**
+  - SSL/TLS kontrolü (sertifika, zayıf şifreler, protokol zafiyetleri)
+  - NSE Script taraması (--script=vuln,auth,default)
+  - Aktif Web Kontrolleri (SQLi, XSS, LFI, Directory Traversal)
+  - Sensitive File Exposure (.env, .git/config, backup dosyaları)
+  - Admin Panel Detection
 - [ ] Reseller olarak müşteri hesabına giriş ("Login as Customer")
 
 ### P1 (Yüksek)
 - [x] Tarama sonrası e-posta bildirimi - ✅ Tamamlandı
 - [ ] Docker Compose dosyası oluşturma (deployment kolaylığı)
+- [ ] Exploit-DB ve GitHub Advisories entegrasyonu (ek zafiyet kaynakları)
 - [ ] Tarama zamanlaması (scheduled scans)
 - [ ] Bulk hedef import (CSV)
 
