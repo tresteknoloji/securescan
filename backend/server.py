@@ -2178,26 +2178,8 @@ class SecureScanAgent:
             i += 1
         
         return findings
-                        if lines[i + j].strip() and not lines[i + j].strip().startswith("|"):
-                            break
-                        description += " " + lines[i + j].strip()
-                    
-                    findings.append({{
-                        "target": target,
-                        "port": current_port,
-                        "type": "nse",
-                        "severity": severity,
-                        "title": title,
-                        "description": description[:500],
-                        "cve_id": cve_id,
-                        "evidence": line.strip()
-                    }})
-                    break
-            
-            # Check for specific NSE script results
-            if "smb-vuln-" in line.lower():
-                findings.append({{
-                    "target": target,
+    
+    async def run_web_checks(self, target: str, ports: list, task_id: str):
                     "port": current_port or 445,
                     "type": "nse",
                     "severity": "critical",
