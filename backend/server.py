@@ -1803,6 +1803,43 @@ class SecureScanAgent:
             "returncode": process.returncode
         }}
     
+    async def run_command_with_heartbeat(self, cmd: str, task_id: str, timeout: int = 300):
+        """
+        Run a long-running command while sending heartbeats to keep WebSocket alive.
+        Sends heartbeat every 30 seconds during command execution.
+        """
+        process = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        # Create heartbeat task
+        async def send_heartbeats():
+            while True:
+                await asyncio.sleep(30)
+                try:
+                    await self.send({{"type": "heartbeat", "task_id": task_id}})
+                    logger.debug(f"Heartbeat sent for task {{task_id}}")
+                except:
+                    break
+        
+        heartbeat_task = asyncio.create_task(send_heartbeats())
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            return stdout.decode(), stderr.decode()
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.communicate()
+            raise asyncio.TimeoutError(f"Command timed out after {{timeout}} seconds")
+        finally:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+    
     async def run_port_scan(self, command: str, params: dict, task_id: str):
         """Run comprehensive nmap scan with SSL/TLS, NSE scripts, and web checks"""
         # Get targets - can be single target or list
