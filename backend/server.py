@@ -2535,12 +2535,12 @@ class SecureScanAgent:
         
         while self.running:
             try:
-                # Increased ping interval and timeout for long-running scans
+                # Lower ping interval to keep connection alive through Nginx
                 async with websockets.connect(
                     ws_url,
-                    ping_interval=60,  # Send ping every 60 seconds
-                    ping_timeout=120,  # Wait 120 seconds for pong
-                    close_timeout=30
+                    ping_interval=20,  # Send ping every 20 seconds (before Nginx 60s timeout)
+                    ping_timeout=30,   # Wait 30 seconds for pong
+                    close_timeout=10
                 ) as ws:
                     self.ws = ws
                     logger.info("Connected to SecureScan panel")
