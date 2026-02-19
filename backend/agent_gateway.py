@@ -629,16 +629,66 @@ class AgentGateway:
         if not product_name or not detected_version:
             return vulnerabilities
         
-        logger.info(f"CVE lookup for {product_name} version {detected_version}")
+        # Check if this is a distro-patched version
+        distro_info = self._extract_distro_info(version)
+        
+        logger.info(f"CVE lookup for {product_name} version {detected_version} (distro: {distro_info})")
         
         # Only look up CVEs if we have specific version info
         # Use CPE-based lookup if available, otherwise use smart description matching
         cve_vulns = await self._cpe_based_cve_lookup(
-            product_name, detected_version, port, target_id, target_value, service, version
+            product_name, detected_version, port, target_id, target_value, service, version, distro_info
         )
         vulnerabilities.extend(cve_vulns)
         
         return vulnerabilities
+    
+    def _extract_distro_info(self, version_str: str) -> dict:
+        """
+        Extract Linux distribution information from version banner.
+        Ubuntu/Debian backport patches that don't change version numbers.
+        Returns dict with distro, release, and patch info.
+        """
+        import re
+        
+        distro_info = {
+            "distro": None,
+            "release": None,
+            "patch_level": None,
+            "is_patched": False
+        }
+        
+        version_lower = version_str.lower()
+        
+        # Ubuntu detection: "OpenSSH 9.6p1 Ubuntu 3ubuntu13.13"
+        ubuntu_match = re.search(r'ubuntu[/_\s]*([\d]+(?:ubuntu[\d.]+)?)', version_lower)
+        if ubuntu_match or 'ubuntu' in version_lower:
+            distro_info["distro"] = "ubuntu"
+            if ubuntu_match:
+                distro_info["patch_level"] = ubuntu_match.group(1)
+            # Check for patch indicators
+            patch_match = re.search(r'(\d+ubuntu[\d.]+)', version_lower)
+            if patch_match:
+                distro_info["is_patched"] = True
+                distro_info["patch_level"] = patch_match.group(1)
+        
+        # Debian detection: "OpenSSH 9.2p1 Debian 2+deb12u2"
+        debian_match = re.search(r'debian[/_\s]*([\d]+(?:\+deb[\d]+u[\d]+)?)', version_lower)
+        if debian_match or 'debian' in version_lower:
+            distro_info["distro"] = "debian"
+            if debian_match:
+                distro_info["patch_level"] = debian_match.group(1)
+            # Check for security update indicators
+            if '+deb' in version_lower and 'u' in version_lower:
+                distro_info["is_patched"] = True
+        
+        # RHEL/CentOS detection
+        rhel_match = re.search(r'(el\d+|rhel|centos)', version_lower)
+        if rhel_match:
+            distro_info["distro"] = "rhel"
+            distro_info["is_patched"] = True  # RHEL backports extensively
+        
+        return distro_info
     
     def _extract_product_version(self, version_str: str, service: str) -> dict:
         """
