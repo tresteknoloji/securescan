@@ -412,6 +412,7 @@ class AgentGateway:
                 "port": ssl_finding.get("port"),
                 "service": "ssl/tls",
                 "evidence": ssl_finding.get("evidence", ""),
+                "confidence": ssl_finding.get("confidence", "confirmed"),
                 "source": "ssl_scan"
             })
         
@@ -422,6 +423,7 @@ class AgentGateway:
             target_id = target_data.get("id", "")
             
             cve_id = nse_finding.get("cve_id")
+            confidence = nse_finding.get("confidence", "confirmed")
             
             # If CVE found, try to get additional info from local database
             references = []
@@ -453,6 +455,7 @@ class AgentGateway:
                 "is_kev": is_kev,
                 "references": references,
                 "evidence": nse_finding.get("evidence", ""),
+                "confidence": confidence,
                 "source": "nse_scan"
             })
         
@@ -468,6 +471,7 @@ class AgentGateway:
                 "severity": web_finding.get("severity", "medium"),
                 "title": web_finding.get("title", "Web Vulnerability"),
                 "description": web_finding.get("description", ""),
+                "confidence": web_finding.get("confidence", "possible"),
                 "port": web_finding.get("port"),
                 "service": "http",
                 "evidence": web_finding.get("evidence", ""),
