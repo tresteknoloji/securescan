@@ -1960,6 +1960,12 @@ class SecureScanAgent:
                 
                 for dns_result in dns_results:
                     host = dns_result.get("host", target)
+                    port_open = dns_result.get("port_open", False)
+                    recursive_enabled = dns_result.get("recursive_enabled", False)
+                    
+                    if not port_open:
+                        continue
+                    
                     all_ports.append({{
                         "target": host,
                         "port": 53,
@@ -1968,16 +1974,31 @@ class SecureScanAgent:
                         "version": ""
                     }})
                     
-                    if dns_result.get("recursive_enabled"):
+                    if recursive_enabled:
+                        # Recursive DNS is enabled - Medium severity risk
                         all_nse_findings.append({{
                             "target": host,
                             "port": 53,
                             "type": "dns",
                             "confidence": "confirmed",
-                            "severity": "high",
+                            "severity": "medium",
                             "title": "DNS Recursive Queries Enabled",
-                            "description": "DNS server accepts recursive queries from external sources. This can be abused for DNS amplification attacks.",
-                            "evidence": dns_result.get("evidence", "Recursion enabled")
+                            "description": f"Port 53 is publicly accessible on {{host}}. DNS server accepts recursive queries from external sources. This can be abused for DNS amplification attacks and may increase the attack surface.",
+                            "evidence": "dns-recursion: Recursion appears to be enabled",
+                            "solution_link": "https://www.tresteknoloji.com/blog/recursive-dns-nedir"
+                        }})
+                    else:
+                        # Port 53 open but no recursion - Info level
+                        all_nse_findings.append({{
+                            "target": host,
+                            "port": 53,
+                            "type": "dns",
+                            "confidence": "confirmed",
+                            "severity": "info",
+                            "title": "DNS Service Exposed – Validation Required",
+                            "description": f"Port 53 is publicly accessible on {{host}}. If this server is not intended to provide public recursive DNS resolution or authoritative DNS services, exposure may increase the attack surface.",
+                            "evidence": "Port 53/udp open, recursive queries not enabled",
+                            "solution_link": "https://www.tresteknoloji.com/blog/recursive-dns-nedir"
                         }})
                 continue
             
