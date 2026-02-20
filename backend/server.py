@@ -1732,7 +1732,7 @@ class SecureScanAgent:
         
         for service in ip_services:
             try:
-                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.2.0"}})
+                req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.2.1"}})
                 response = urllib.request.urlopen(req, timeout=5)
                 ip = response.read().decode('utf-8').strip()
                 if ip and len(ip) < 50:  # Basic validation
