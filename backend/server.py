@@ -2497,14 +2497,23 @@ class SecureScanAgent:
             await self.send({{"type": "tool_installed", "tool": tool_name}})
         return result
     
+    def is_ws_open(self):
+        """Check if WebSocket connection is open - websockets 15.x compatible"""
+        try:
+            from websockets.protocol import State
+            return self.ws is not None and self.ws.state == State.OPEN
+        except:
+            # Fallback for older versions
+            return self.ws is not None
+    
     async def send(self, message: dict):
         """Send message to panel with connection check"""
         try:
-            if self.ws and not self.ws.closed:
+            if self.is_ws_open():
                 await self.ws.send(json.dumps(message))
                 return True
             else:
-                logger.warning("WebSocket is closed, cannot send")
+                logger.warning("WebSocket is not open, cannot send")
                 return False
         except Exception as e:
             logger.error(f"Send error: {{e}}")
@@ -2514,11 +2523,11 @@ class SecureScanAgent:
         """Send a message with retry logic for critical messages like task_completed"""
         for attempt in range(max_retries):
             try:
-                if self.ws and not self.ws.closed:
+                if self.is_ws_open():
                     await self.ws.send(json.dumps(message))
                     return True
                 else:
-                    logger.warning(f"WebSocket closed, attempt {{attempt + 1}}/{{max_retries}}")
+                    logger.warning(f"WebSocket not open, attempt {{attempt + 1}}/{{max_retries}}")
                     # Wait for reconnection
                     await asyncio.sleep(5)
             except Exception as e:
