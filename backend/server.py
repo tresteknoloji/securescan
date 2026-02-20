@@ -1721,7 +1721,7 @@ class SecureScanAgent:
                 "os_info": os_info,
                 "installed_tools": tools,
                 "detected_networks": networks,
-                "agent_version": "1.3.0",
+                "agent_version": SCANNER_VERSION,
                 "hostname": socket.gethostname(),
                 "ip_address": self.get_public_ip()
             }}
