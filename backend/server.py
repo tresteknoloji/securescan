@@ -2169,6 +2169,60 @@
             
             return findings
         
+        async def verify_cipher_support(self, target: str, port: int, cipher_name: str):
+            """
+            Actively verify if a specific cipher is actually supported.
+            Returns True only if TLS handshake succeeds with this cipher.
+            """
+            import ssl
+            import socket
+            
+            try:
+                # Map cipher name to OpenSSL cipher string
+                openssl_ciphers = {{
+                    "NULL": "NULL",
+                    "DES": "DES-CBC-SHA:DES-CBC3-SHA",
+                    "RC4": "RC4",
+                    "EXPORT": "EXPORT",
+                    "MD5": "MD5",
+                    "3DES": "3DES",
+                }}
+                
+                cipher_str = openssl_ciphers.get(cipher_name.upper(), cipher_name)
+                
+                # Create SSL context with specific cipher
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                
+                try:
+                    context.set_ciphers(cipher_str)
+                except ssl.SSLError:
+                    # Cipher not supported by our OpenSSL
+                    return None  # Cannot test
+                
+                # Attempt connection with short timeout
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                
+                try:
+                    sock.connect((target, port))
+                    ssl_sock = context.wrap_socket(sock, server_hostname=target)
+                    # If we get here, handshake succeeded
+                    negotiated = ssl_sock.cipher()
+                    ssl_sock.close()
+                    return True  # Cipher IS supported
+                except ssl.SSLError as e:
+                    if "handshake failure" in str(e).lower() or "no ciphers" in str(e).lower():
+                        return False  # Server rejected the cipher
+                    return None  # Other error, inconclusive
+                except Exception:
+                    return None  # Network error, inconclusive
+                finally:
+                    sock.close()
+            except Exception:
+                return None
+        
         def parse_nse_findings(self, output: str, target: str):
             """
             Parse NSE vulnerability script output with proper filtering.
