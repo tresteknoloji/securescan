@@ -1876,11 +1876,39 @@ class SecureScanAgent:
             # Phase 1: Port Discovery & Service Detection (20% per target)
             await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 5}})
             
-            # Build nmap command with enhanced service detection
+            # Handle special scan types first
+            if scan_type == "dns_recursive":
+                # DNS Recursive check - only scan port 53
+                dns_result = await self.check_dns_recursive(target, task_id)
+                if dns_result:
+                    all_ports.append({{
+                        "target": target,
+                        "port": 53,
+                        "state": "open" if dns_result.get("port_open") else "filtered",
+                        "service": "dns",
+                        "version": dns_result.get("version", "")
+                    }})
+                    if dns_result.get("recursive_enabled"):
+                        all_nse_findings.append({{
+                            "target": target,
+                            "port": 53,
+                            "type": "dns",
+                            "confidence": "confirmed",
+                            "severity": "high",
+                            "title": "DNS Recursive Queries Enabled",
+                            "description": "DNS server accepts recursive queries from external sources. This can be abused for DNS amplification attacks.",
+                            "evidence": dns_result.get("evidence", "Recursive query successful")
+                        }})
+                continue
+            
+            # Build nmap command based on scan type
             if scan_type == "quick":
                 cmd = f"nmap -sV -sC -T4 --top-ports 100 --version-intensity 5 {{target}}"
             elif scan_type == "stealth":
                 cmd = f"nmap -sS -sV -T2 -p {{port_range}} --version-intensity 5 {{target}}"
+            elif scan_type == "port_only":
+                # Port-only scan: Fast scan, no scripts, just service detection
+                cmd = f"nmap -sV -T4 -p {{port_range}} --version-intensity 3 {{target}}"
             else:
                 cmd = f"nmap -sV -sC -T4 -p {{port_range}} --version-intensity 7 --script=banner {{target}}"
             
@@ -1900,6 +1928,10 @@ class SecureScanAgent:
             for port in ports:
                 port["target"] = target
             all_ports.extend(ports)
+            
+            # For port_only scan, skip SSL/NSE/Web checks
+            if scan_type == "port_only":
+                continue
             
             # Get open ports for further scanning
             open_ports = [p["port"] for p in ports if p.get("state") == "open"]
