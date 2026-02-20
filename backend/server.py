@@ -1845,6 +1845,79 @@ class SecureScanAgent:
             except asyncio.CancelledError:
                 pass
     
+    async def check_dns_recursive(self, target: str, task_id: str):
+        """
+        Check if a DNS server allows recursive queries from external sources.
+        This is a security risk as it can be used for DNS amplification attacks.
+        """
+        import socket
+        import struct
+        
+        result = {{
+            "port_open": False,
+            "recursive_enabled": False,
+            "version": "",
+            "evidence": ""
+        }}
+        
+        try:
+            await self.send({{"type": "heartbeat", "task_id": task_id}})
+            
+            # First check if port 53 is open using nmap
+            port_check_cmd = f"nmap -sU -sT -p 53 -sV {{target}}"
+            logger.info(f"DNS Check: {{port_check_cmd}}")
+            
+            stdout, stderr = await self.run_command_with_heartbeat(port_check_cmd, task_id, timeout=60)
+            
+            if "open" in stdout.lower():
+                result["port_open"] = True
+                
+                # Extract version if available
+                import re
+                version_match = re.search(r"53/(?:tcp|udp)\\s+open\\s+domain\\s+(.+)", stdout)
+                if version_match:
+                    result["version"] = version_match.group(1).strip()
+            else:
+                return result
+            
+            await self.send({{"type": "heartbeat", "task_id": task_id}})
+            
+            # Now test for recursive queries using dig
+            # Try to resolve an external domain through this DNS server
+            test_domain = "www.google.com"
+            dig_cmd = f"dig @{{target}} {{test_domain}} +recurse +time=5 +tries=2"
+            logger.info(f"DNS Recursive Test: {{dig_cmd}}")
+            
+            try:
+                dig_stdout, dig_stderr = await self.run_command_with_heartbeat(dig_cmd, task_id, timeout=30)
+                
+                # Check if we got a valid response (NOERROR status and an answer)
+                if "NOERROR" in dig_stdout and "ANSWER SECTION" in dig_stdout:
+                    result["recursive_enabled"] = True
+                    result["evidence"] = f"Successfully resolved {{test_domain}} through {{target}}. Server accepts recursive queries."
+                    
+                    # Extract the IP from the answer for evidence
+                    answer_match = re.search(r"{{test_domain}}\\.\\s+\\d+\\s+IN\\s+A\\s+([\\d.]+)", dig_stdout)
+                    if answer_match:
+                        result["evidence"] += f" Resolved IP: {{answer_match.group(1)}}"
+                elif "REFUSED" in dig_stdout:
+                    result["evidence"] = "Server refused recursive query (properly configured)"
+                elif "SERVFAIL" in dig_stdout:
+                    result["evidence"] = "Server returned SERVFAIL for recursive query"
+                else:
+                    result["evidence"] = "No valid response to recursive query"
+                    
+            except Exception as e:
+                logger.warning(f"dig command failed: {{e}}")
+                result["evidence"] = f"Could not test recursive queries: {{str(e)}}"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"DNS recursive check failed: {{e}}")
+            result["evidence"] = f"Check failed: {{str(e)}}"
+            return result
+    
     async def run_port_scan(self, command: str, params: dict, task_id: str):
         """Run comprehensive nmap scan with SSL/TLS, NSE scripts, and web checks"""
         # Get targets - can be single target or list
