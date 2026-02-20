@@ -1942,26 +1942,30 @@ class SecureScanAgent:
             
             # Handle special scan types first
             if scan_type == "dns_recursive":
-                # DNS Recursive check - only scan port 53
-                dns_result = await self.check_dns_recursive(target, task_id)
-                if dns_result:
+                # DNS Recursive check - fast scan with nmap dns-recursion script
+                # Supports CIDR prefixes (e.g., 192.168.1.0/24)
+                dns_results = await self.check_dns_recursive(target, task_id)
+                
+                for dns_result in dns_results:
+                    host = dns_result.get("host", target)
                     all_ports.append({{
-                        "target": target,
+                        "target": host,
                         "port": 53,
-                        "state": "open" if dns_result.get("port_open") else "filtered",
+                        "state": "open",
                         "service": "dns",
-                        "version": dns_result.get("version", "")
+                        "version": ""
                     }})
+                    
                     if dns_result.get("recursive_enabled"):
                         all_nse_findings.append({{
-                            "target": target,
+                            "target": host,
                             "port": 53,
                             "type": "dns",
                             "confidence": "confirmed",
                             "severity": "high",
                             "title": "DNS Recursive Queries Enabled",
                             "description": "DNS server accepts recursive queries from external sources. This can be abused for DNS amplification attacks.",
-                            "evidence": dns_result.get("evidence", "Recursive query successful")
+                            "evidence": dns_result.get("evidence", "Recursion enabled")
                         }})
                 continue
             
