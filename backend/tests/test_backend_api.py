@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nmap-intel-center.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nessus-like.preview.emergentagent.com')
 
 # Test Credentials
 ADMIN_EMAIL = "admin@securescan.com"

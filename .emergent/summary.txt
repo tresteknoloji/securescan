@@ -18,139 +18,155 @@ The user requested a vulnerability scanning panel similar to Nessus.
 **User's preferred language**: Türkçe
 
 **what currently exists?**
-A full-stack application with a FastAPI backend and React frontend. It features role-based access control, JWT authentication, on-demand themed reporting, and scan history with iterations.
+The application features a FastAPI/React stack with an agent-based scanning architecture. Scans are dispatched to remote Python agents via a WebSocket gateway. The agent code is dynamically generated and embedded within .
 
-The application's core architecture has been fundamentally refactored to an **agent-based model**. All scans are now executed on remote lightweight Python agents deployed on client Linux machines. The central panel communicates with these agents in real-time via a **WebSocket gateway**.
-
-The panel now includes:
--   **Agent Management Page**: A UI for creating agents, viewing their status (online/offline), and generating one-time installation commands.
--   **Dynamic Agent Installation**: A secure API endpoint () that generates a bash script containing the full agent code. This script installs the agent as a  service on the target machine.
--   **Agent-driven Scans**: The New Scan and Rescan functionalities have been entirely rewritten to dispatch scan tasks to selected online agents. The panel server no longer performs scans locally.
--   **Centralized Intelligence**: Agents only run  to collect raw port, service, and version data. All vulnerability analysis (dangerous port checks, CVE/KEV lookups) is performed on the panel's backend after receiving the raw data, ensuring the intelligence remains on the central server.
+The system is currently in an unstable state. While features for advanced scanning (SSL, NSE, Web), confidence scoring, and improved reporting have been added, they are plagued by three critical, intertwined issues:
+1.  **Vulnerability Engine False Positives:** The engine produces a high number of false positives because it relies on simple version matching and is not fully aware of distribution-specific backported patches (e.g., Ubuntu).
+2.  **WebSocket Instability:** Long-running scans cause the WebSocket connection to time out, making scans appear stuck on the frontend and preventing results from being reported. Multiple attempts to fix this with heartbeats and retry logic have failed, though a promising fix was just implemented but is unverified.
+3.  **Agent Info Regression:** The latest agent version (1.1.0) seems to have introduced a regression where the agent's IP address and OS are no longer displayed correctly on the panel.
 
 **Last working item**:
--   **Last item agent was working**: The user requested to enhance the agent's scanning capabilities. The agent agreed to a plan to implement more advanced scanning techniques.
--   **Status**: NOT STARTED
+-   **Last item agent was working**: The user reported that after updating to the latest agent version (), the agent's IP address shows as  and the OS is Unknown on the panel, which is a regression from previous behavior. The agent was starting to investigate this.
+-   **Status**: IN PROGRESS
 -   **Agent Testing Done**: N
--   **Which testing method agent to use?**: both. This is a significant feature enhancement that will touch the agent's code (in ), the backend gateway () for processing new results, and potentially the database models and frontend UI to display new types of findings. A full end-to-end test will be required.
--   **User Testing Done**: N
+-   **Which testing method agent to use?**: both. The backend logic in  that processes the  message from the agent needs to be verified. The frontend  needs to be checked to ensure it correctly displays the data once the backend fix is in place.
+-   **User Testing Done**: Y (User reported the bug).
 
 **All Pending/In progress Issue list**:
-There are no pending bugs. The previous issues regarding missing CVE references and displaying scan failure reasons have been resolved. The current work is a new feature request.
+-   **Issue 1: Agent Info Missing in Panel (P0)**
+-   **Issue 2: WebSocket Instability During Long Scans (P0)**
+-   **Issue 3: High Rate of False Positives in Vulnerability Engine (P1)**
+
+**Issues Detail:**
+-   **Issue 1: Agent Info Missing in Panel (P0)**
+    -   **Attempted fixes**: None. This is a newly reported regression.
+    -   **Next debug checklist**:
+        1.  Check the agent logs (-- No entries --) on the user's machine to see if the  message is being sent correctly upon connection.
+        2.  Inspect the  function within the agent code in  for any potential errors.
+        3.  Examine the  logic in  to ensure it correctly parses the incoming message and updates the agent document in the database with the IP and OS info.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a core functionality regression. Fixing it will restore the user's ability to identify and manage their agents from the panel.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: Y (It was working before the latest changes).
+    -   **Should Test frontend/backend/both after fix?**: both
+    -   **Blocked on other issue**: None
+
+-   **Issue 2: WebSocket Instability During Long Scans (P0)**
+    -   **Attempted fixes**:
+        -   Added heartbeats during long Nmap processes. **Failed.**
+        -   Added a  mechanism for the final report. **Failed.**
+        -   Increased server-side websocket timeouts. **Failed.**
+        -   Simplified NSE and Web check logic to run faster. **Failed.**
+        -   **Last Fix (v1.1.0):** Corrected a critical bug in the connection check ( was changed to ). Also decreased the agent's  to 20s to be more proactive than a potential 60s Nginx proxy timeout. **This fix is unverified and may not have been active during the user's last test.**
+    -   **Next debug checklist**:
+        1.  **Confirm the user is running agent v1.1.0.** Have the user run  on their agent machine.
+        2.  **Confirm the user's Nginx configuration.** The user was advised to add  and  for the WebSocket location, but it's unknown if they did.
+        3.  If the issue persists with v1.1.0 and correct Nginx settings, re-examine the  and  functions in the agent code () to ensure no blocking calls can last longer than the ping interval (20s).
+    -   **Why fix this issue and what will be achieved with the fix?**: This is the **most critical blocker**. Without a stable connection, no scan can complete, and no other feature or fix can be reliably tested.
+    -   **Status**: BLOCKED (Pending user confirmation of agent version and Nginx config)
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: backend
+    -   **Blocked on other issue**: None
+
+-   **Issue 3: High Rate of False Positives in Vulnerability Engine (P1)**
+    -   **Attempted fixes**: The agent made several changes to  and the agent code in  to improve detection logic: introduced  scoring, added checks for SQL error patterns, and added a basic check for Ubuntu backported patches.
+    -   **Next debug checklist**:
+        1.  This issue cannot be properly addressed until the WebSocket Instability (Issue 2) is resolved.
+        2.  Once scans can complete, run a scan against a known target and analyze the results to see if the false positive rate has decreased.
+        3.  Focus on the distro-aware logic in . The current implementation is very basic and likely needs to be expanded to properly handle patched versions.
+    -   **Why fix this issue and what will be achieved with the fix?**: This addresses the core value of the application. A scanner full of false positives is not useful.
+    -   **Status**: BLOCKED
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: backend
+    -   **Blocked on other issue**: Issue 2: WebSocket Instability During Long Scans
 
 **In progress Task List**:
--   **Task 1: Enhance Agent Scanning Capabilities (P0)**
-    -   **Where to resume**: The agent code is located inside a multiline string in the  function in . This is where the changes need to be made.
-    -   **What will be achieved**: The agent will be able to perform more in-depth scans, detecting a wider range of vulnerabilities.
-    -   **Status**: NOT STARTED
-    -   **Should Test frontend/backend/both after fix?**: both
-    -   **Blocked on something**: None
+-   None. All current work is focused on fixing the critical bugs above.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   (P0) **Enhance Agent Scanning Capabilities**: Implement the following features into the agent's scan logic:
-        1.  **SSL/TLS Control**: Use Nmap's  scripts to check for certificate validity, weak ciphers, and common SSL/TLS vulnerabilities.
-        2.  **Script Scanning**: Run Nmap's  script category () to actively check for known vulnerabilities.
-        3.  **Deeper Banner Grabbing**: Enhance service version detection.
-        4.  **Active Checks**: Add simple probes for common web vulnerabilities like SQLi, XSS, and LFI.
     -   (P1) Implement Reseller Login-as-Customer feature.
     -   (P2) Create a Docker Compose file () to simplify server deployment.
 -   **Future Tasks**:
     -   (P1) Integrate additional vulnerability sources like Exploit-DB and GitHub Advisories into the panel's analysis engine.
 
 **Completed work in this session**
--   **Implemented: Agent-Based Scanning Architecture (Major Feature)**
-    -   Created a WebSocket gateway () for real-time, bidirectional communication between the panel and agents.
-    -   Added  and  models to .
-    -   Developed a dynamic  script, served via an API endpoint in , which contains the full Python agent code and sets it up as a  service.
-    -   Created a new Agent Management page ().
-    -   Refactored the New Scan () and  () logic to delegate all scan tasks to agents.
-    -   Centralized the vulnerability analysis logic on the panel backend (), with agents only providing raw Nmap data.
--   **Fixed: CVE Reference Links in Reports**
-    -   Corrected the data parsing logic in  and  to handle the object structure of CVE references, ensuring they appear in reports.
--   **Fixed: Scan Failure Reason in UI**
-    -   Completed the feature to store a  in the database (, ) and display it in an alert on the .
--   **Fixed: Agent Logic Bugs**
-    -   Resolved an issue where the agent was not receiving the target IP address.
-    -   Corrected the  function, which was incorrectly running scans locally instead of using an agent.
--   **Deployment Support**: Assisted the user in debugging their Nginx configuration to correctly proxy API and WebSocket traffic.
+-   **Initial implementation of advanced scanning**: Added logic for SSL/TLS checks, NSE  script scanning, and basic web vulnerability checks to the agent.
+-   **Vulnerability model enhancement**: Added , , and  fields to the  model in .
+-   **UI/UX Improvements**:
+    -   Added Start Time, End Time, and Duration to the  and PDF/HTML reports.
+    -   Replaced the Tools column with Creation Date on the .
+    -   Added badges for different finding sources (SSL, NSE, WEB) and confidence levels on .
+-   **Implemented Agent Public IP Reporting**: The agent now attempts to report its public IP to the panel.
+-   **Extensive (but so far unsuccessful) debugging of WebSocket timeouts**: Implemented multiple versions of heartbeat and retry logic.
 
 **Earlier issues found/mentioned but not fixed**
--   None. All raised issues were addressed.
+-   The detailed list of false positive problems from the user's message () has only been partially addressed. The core issue of not being fully distro-aware for backported patches on SSH and Nginx remains a significant problem.
 
 **Known issue recurrence from previous fork**
--   The issue with CVE reference links missing from reports was a recurring problem. It has been definitively fixed by making the data processing functions in  and  robust enough to handle the data structure coming from the database.
+-   **WebSocket Timeout**: This is the defining recurring issue of this session. The agent has been stuck in a loop of implementing a fix, the user testing it, and it failing again for a different reason. The root cause appears to be a combination of long-running blocking calls in the agent and infrastructure timeouts (like Nginx).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Backend**: FastAPI, MongoDB (), JWT, , usage: websockets [--version | <uri>], 
------
-
-WeasyPrint could not import some external libraries. Please carefully follow the installation steps before reporting an issue:
-https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
-https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#troubleshooting 
-
------, .
+-   **Backend**: FastAPI, MongoDB (), JWT, , usage: websockets [--version | <uri>].
 -   **Frontend**: React, Tailwind CSS, Shadcn/UI, .
--   **Architecture**: **Agent-Based Scanning**, Scan Iterations, On-Demand Reporting, WebSocket Communication, Centralized Intelligence.
+-   **Architecture**: Agent-Based Scanning, WebSocket Communication.
+-   **Debugging Focus**: WebSocket keepalives (, ), Nginx proxy timeouts (), non-blocking process execution in Python.
 
 **key DB schema**
--   **User**: , , , .
--   **Scan**: , , , , .
--   **Agent**: uid=0(root) gid=0(root) groups=0(root), , ,  (hashed),  ('online'/'offline'), , .
--   **AgentTask**: uid=0(root) gid=0(root) groups=0(root), , ,  ('pending'/'running'/'completed'), .
--   **Vulnerability**: , , , , , .
+-   **Agent**: uid=0(root) gid=0(root) groups=0(root), , , , , , ,  (NEW).
+-   **Vulnerability**: , , , , ,  (NEW),  (NEW),  (NEW),  (NEW).
 
 **All files of reference**
--   : The heart of the new architecture. Contains Agent CRUD APIs, WebSocket registration, and the dynamic  script which holds the complete Python agent code.
--   : Manages all WebSocket connections, dispatches tasks, and processes incoming scan results from agents.
--   : Defines the schemas for  and .
--   : The UI for creating, viewing, and managing agents.
--   : The UI for starting a scan, which now requires selecting an online agent.
+-   : Contains the Python agent source code as a multiline string. This is where all agent-side logic (scanning, heartbeats, retries) is defined.
+-   : The WebSocket server that manages agent connections, handles incoming data, and orchestrates database updates. All panel-side logic for timeouts and data processing is here.
+-   : The page where the user is seeing the new regression (missing IP/OS).
+-   : The page where scan results (and their potential false positives) are displayed.
 
 **Critical Info for New Agent**
--   **The entire scanning architecture has been rebuilt.** Scans no longer run on the panel server. They are executed by remote Python agents.
--   **The agent's source code is a multi-line string inside the  function in .** To modify the agent's behavior (e.g., add new scanning techniques), you must edit the Python code within that string.
--   The panel and agents communicate over WebSockets.  handles the panel's side of this communication.
--   The immediate next task is to enhance the agent's scanning capabilities as detailed in the Upcoming Tasks section. This will require modifying the agent's code in .
+-   **You are entering a debugging session.** Do not start any new features. The application is fundamentally broken for the user.
+-   There are three critical, intertwined bugs: **Agent Info Regression**, **WebSocket Instability**, and **Vulnerability Engine False Positives**.
+-   **Priority 1 is to solve the WebSocket Instability.** Nothing else can be tested until scans can reliably complete. The most promising lead is the fix in agent v1.1.0 (). You MUST confirm with the user that they have installed this version AND have configured their Nginx proxy timeouts correctly before you do anything else.
+-   **Priority 2 is to solve the Agent Info Regression.** This is the most recent bug the user reported and is a frustrating user experience.
+-   **Priority 3 is to address the False Positives.** This can only be done after the WebSocket is stable.
+-   Do not trust that the latest fix works until the user confirms it with logs from a successful, long-running scan. The agent has been stuck in a debug loop because it kept assuming its fixes would work.
 
 **documents and test reports created in this job**
--   /app/memory/PRD.md
--   /app/test_reports/iteration_2.json
+-   
+-   
 
 **Last 10 User Messages and any pending HUMAN messages**
-10. **User**: Reports that agent scans run but find no vulnerabilities. **Agent**: Diagnosed that the analysis logic was incorrectly on the agent side and refactored the architecture to perform all analysis on the panel. (Completed)
-9.  **User**: Reports that the  sidebar link is not translated. **Agent**: Confirmed the translation exists in the code and advised the user to rebuild the frontend and clear cache. (Completed)
-8.  **User**: Reports that  still runs scans locally. **Agent**: Identified the oversight and updated the  function to use the new agent system. (Completed)
-7.  **User**: Reports their  URL is giving a 404 error. **Agent**: Helped the user debug their Nginx configuration, leading to a fix. (Completed)
-6.  **User**: Asks where the  file is located. **Agent**: Explained that it is not a physical file but is dynamically generated by an API endpoint in . (Completed)
-5.  **User**: Asks for the list of files to update for the agent system. **Agent**: Provided the list of new and modified files. (Completed)
-4.  **User**: States that all scans must run via agents and that Faz 3 & 4 of the plan should be completed. **Agent**: Implemented the required changes. (Completed)
-3.  **User**: Asks why the  field is needed for an agent. **Agent**: Agreed it was unnecessary and removed it from the backend and frontend. (Completed)
-2.  **User**: Asks for a summary of the current scanning logic. **Agent**: Provided a detailed breakdown of the new agent-based architecture. (Completed)
-1.  **User**: Approves the new architecture and requests adding more advanced scanning capabilities (SSL/TLS checks, Active Checks, NSE scripts). **Agent**: Agreed to the plan. (This is the **current task**).
+10. **User**: Reports that two scans failed with the same error () even after agent v1.0.9 was installed. The scan is still getting stuck.
+9. **Agent**: Diagnoses the error as a faulty connection check ( instead of ). Implements agent v1.1.0 with the fix and advises user to update Nginx timeouts.
+8. **User**: Asks if the agent version is still 1.0.9.
+7. **Agent**: Clarifies the new version is 1.1.0 and provides instructions for the user to reinstall the agent and verify the version.
+6. **User**: **Reports a new bug.** After installing the new agent, the panel now shows the IP as  and the OS as Unknown. Confirms the agent file on the server shows version . **(This is the current state).**
+5. **Agent**: Acknowledges the new regression and starts investigating the  function.
+4. **User**: (User provides long log showing heartbeats working for a while, then the connection dropping after the NSE scan times out and web checks begin. **This log is from before the final fix**). Asks why the NSE scan is timing out and causing the whole process to fail.
+3. **Agent**: Identifies that the web checks were missing a heartbeat. Simplifies NSE scripts and adds heartbeats to web checks in agent v1.0.8.
+2. **User**: (User provides another log of a failed scan, even with heartbeats). Complains that the issue is still not solved and asks what changed.
+1. **Agent**: States only  was updated and that the user needs to reinstall the agent to get the latest code.
 
 **Project Health Check:**
--   **Broken**: None.
--   **Mocked**: N/A
+-   **Broken**: The core scanning functionality is unreliable due to persistent WebSocket timeouts. The agent management UI has a new regression.
 
 **3rd Party Integrations**
--   **NVD (National Vulnerability Database)** — Used for fetching CVE information.
--   **CISA KEV (Known Exploited Vulnerabilities Catalog)** - Used for enriching CVEs with real-world exploit data.
--   **Nmap** — Command-line tool for network scanning, executed by remote agents.
+-   **NVD (National Vulnerability Database)**
+-   **CISA KEV (Known Exploited Vulnerabilities Catalog)**
+-   **Nmap**
 
 **Testing status**
--   **Testing agent used after significant changes**: YES
+-   **Testing agent used after significant changes**: YES, but it passed tests in an ideal environment. It failed to catch the real-world timeout and false positive issues reported by the user.
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: []
--   **Known regressions**: None.
+-   **Known regressions**: [Agent IP address and OS information is not displayed correctly on the Agents page.]
 
 **Credentials to test flow:**
 -   **Email**: 
 -   **Password**: 
 
 **What agent forgot to execute**
--   Initially, the agent overlooked updating the  function to use the new agent architecture, which the user later pointed out. This was corrected.
--   The first implementation of the agent had a significant architectural flaw (analysis logic was on the agent). This was corrected after user feedback, leading to a more robust and correct architecture.</analysis>
+-   The agent repeatedly failed to ensure the user was running the correct version of the agent code before debugging subsequent failures, leading to wasted cycles.
+-   The agent did not ask for the user's Nginx configuration file, instead only providing advice. This is a critical piece of the puzzle that is still missing.
+-   The agent moved on to fixing new bugs before getting confirmation that previous critical fixes (like the WebSocket timeout) were actually working for the user.</analysis>
