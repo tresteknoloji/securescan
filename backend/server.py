@@ -1671,7 +1671,7 @@ logger = logging.getLogger("SecureScan-Agent")
 CONFIG_FILE = Path("/opt/securescan-agent/config.json")
 
 # Scanner identification - sent in all HTTP requests
-SCANNER_VERSION = "1.3.0"
+SCANNER_VERSION = "1.3.1"
 SCANNER_NAME = "Tres Technology SecureScan"
 SCANNER_USER_AGENT = f"{{SCANNER_NAME}}/{{SCANNER_VERSION}} (Security Scanner; +https://tresteknoloji.com)"
 SCANNER_HEADERS = {{
