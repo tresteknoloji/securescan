@@ -133,6 +133,20 @@ export default function NewScanPage() {
       return;
     }
 
+    // DNS Recursive scan only works with IP and Prefix targets
+    if (config.scan_type === 'dns_recursive') {
+      const selectedTargetObjects = targets.filter(t => selectedTargets.includes(t.id));
+      const invalidTargets = selectedTargetObjects.filter(t => t.target_type === 'domain');
+      if (invalidTargets.length > 0) {
+        toast.error(
+          language === 'tr' 
+            ? 'Recursive DNS taraması sadece IP ve Prefix hedeflerle çalışır. Domain hedefleri kaldırın.' 
+            : 'Recursive DNS scan only works with IP and Prefix targets. Remove domain targets.'
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
