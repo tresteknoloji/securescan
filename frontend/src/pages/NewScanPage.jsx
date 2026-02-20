@@ -136,16 +136,23 @@ export default function NewScanPage() {
     setSubmitting(true);
 
     try {
+      // Determine port range based on scan type
+      let portRange = config.port_range;
+      if (config.scan_type === 'quick') portRange = '1-100';
+      else if (config.scan_type === 'full') portRange = '1-65535';
+      else if (config.scan_type === 'port_only') portRange = '1-65535';
+      else if (config.scan_type === 'dns_recursive') portRange = '53';
+
       const response = await api.post('/scans', {
         name: scanName,
         target_ids: selectedTargets,
         agent_id: selectedAgent,
         config: {
           scan_type: config.scan_type,
-          port_range: config.scan_type === 'quick' ? '1-100' : config.scan_type === 'full' ? '1-65535' : config.port_range,
-          check_ssl: config.check_ssl,
-          check_cve: config.check_cve,
-          pci_compliance: config.pci_compliance,
+          port_range: portRange,
+          check_ssl: config.scan_type === 'dns_recursive' ? false : config.check_ssl,
+          check_cve: config.scan_type === 'dns_recursive' ? false : config.check_cve,
+          pci_compliance: config.scan_type === 'dns_recursive' ? false : config.pci_compliance,
         },
       });
 
