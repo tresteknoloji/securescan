@@ -1979,115 +1979,219 @@ class SecureScanAgent:
         }}
     
     def parse_ssl_findings(self, output: str, target: str):
-        """Parse SSL/TLS scan output for vulnerabilities"""
+        """
+        Parse SSL/TLS scan output with proper validation.
+        
+        Key improvements:
+        - Uses nmap ssl-enum-ciphers grade system (A-F)
+        - Only reports ciphers that were ACTUALLY negotiated (appear in enumeration)
+        - Filters out false positives from simple string matching
+        - Adds confidence level to all findings
+        """
+        import re
         findings = []
         current_port = None
+        current_protocol = None
+        reported_items = set()  # Avoid duplicates
+        in_cipher_section = False
         
         lines = output.split("\\n")
         
         for i, line in enumerate(lines):
-            # Get port context
-            import re
+            line_stripped = line.strip()
+            
+            # Get port context from nmap output
             port_match = re.search(r"(\\d+)/tcp", line)
             if port_match:
                 current_port = int(port_match.group(1))
+                in_cipher_section = False
             
-            # Check for weak SSL/TLS versions
-            if "SSLv2" in line or "SSLv3" in line:
-                findings.append({{
-                    "target": target,
-                    "port": current_port,
-                    "type": "ssl",
-                    "severity": "critical",
-                    "title": "Deprecated SSL Protocol Supported",
-                    "description": "Server supports SSLv2/SSLv3 which have known vulnerabilities (POODLE, DROWN).",
-                    "evidence": line.strip()
-                }})
+            # Detect protocol sections - these are CONFIRMED by actual nmap TLS negotiation
+            # Format: "|   TLSv1.2:" or "|   SSLv3:"
+            protocol_match = re.match(r"\\|\\s{3}(SSLv[23]|TLSv1\\.[0-3]):", line)
+            if protocol_match:
+                current_protocol = protocol_match.group(1)
+                in_cipher_section = True
+                
+                # Report deprecated protocols - CONFIRMED because nmap successfully negotiated
+                key = (current_port, current_protocol)
+                if key not in reported_items:
+                    reported_items.add(key)
+                    
+                    if current_protocol in ["SSLv2", "SSLv3"]:
+                        findings.append({{
+                            "target": target,
+                            "port": current_port,
+                            "type": "ssl",
+                            "confidence": "confirmed",
+                            "severity": "critical",
+                            "title": f"Deprecated {{current_protocol}} Protocol Supported",
+                            "description": f"Server accepted {{current_protocol}} handshake. This protocol has critical vulnerabilities (POODLE, DROWN).",
+                            "evidence": f"Protocol {{current_protocol}} successfully negotiated on port {{current_port}}"
+                        }})
+                    elif current_protocol == "TLSv1.0":
+                        findings.append({{
+                            "target": target,
+                            "port": current_port,
+                            "type": "ssl",
+                            "confidence": "confirmed",
+                            "severity": "high",
+                            "title": "TLS 1.0 Supported",
+                            "description": "Server accepted TLS 1.0 handshake. This version is deprecated and vulnerable to BEAST attack.",
+                            "evidence": f"TLSv1.0 successfully negotiated on port {{current_port}}"
+                        }})
+                    elif current_protocol == "TLSv1.1":
+                        findings.append({{
+                            "target": target,
+                            "port": current_port,
+                            "type": "ssl",
+                            "confidence": "confirmed",
+                            "severity": "medium",
+                            "title": "TLS 1.1 Supported",
+                            "description": "TLS 1.1 is deprecated. Upgrade to TLS 1.2 or higher.",
+                            "evidence": f"TLSv1.1 successfully negotiated on port {{current_port}}"
+                        }})
+                continue
             
-            if "TLSv1.0" in line:
-                findings.append({{
-                    "target": target,
-                    "port": current_port,
-                    "type": "ssl",
-                    "severity": "high",
-                    "title": "TLS 1.0 Supported",
-                    "description": "TLS 1.0 is deprecated and vulnerable to BEAST attack.",
-                    "evidence": line.strip()
-                }})
-            
-            if "TLSv1.1" in line:
-                findings.append({{
-                    "target": target,
-                    "port": current_port,
-                    "type": "ssl",
-                    "severity": "medium",
-                    "title": "TLS 1.1 Supported",
-                    "description": "TLS 1.1 is deprecated. Use TLS 1.2 or higher.",
-                    "evidence": line.strip()
-                }})
-            
-            # Check for weak ciphers
-            weak_ciphers = ["RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "anon", "SEED", "IDEA"]
-            for cipher in weak_ciphers:
-                if cipher in line.upper():
+            # Parse ACTUAL cipher lines with grade (format: "|       TLS_RSA_WITH_AES_256_CBC_SHA (rsa 2048) - A")
+            # These ciphers were ACTUALLY negotiated by nmap - not just listed
+            cipher_match = re.match(r"\\|\\s{7}(TLS_[A-Z0-9_]+|SSL_[A-Z0-9_]+)(?:\\s*\\([^)]+\\))?\\s*-\\s*([A-F])", line)
+            if cipher_match and current_protocol and in_cipher_section:
+                cipher_name = cipher_match.group(1)
+                grade = cipher_match.group(2)
+                
+                key = (current_port, cipher_name)
+                if key in reported_items:
+                    continue
+                
+                # Define weak cipher patterns and their severity
+                # Only flag ciphers that are ACTUALLY weak (not just containing a substring)
+                weak_patterns = [
+                    (r"_NULL_", "critical", "NULL cipher provides no encryption"),
+                    (r"_EXPORT", "critical", "EXPORT cipher uses intentionally weakened 40-56 bit keys"),
+                    (r"_anon_", "critical", "Anonymous cipher allows man-in-the-middle attacks"),
+                    (r"^TLS_RSA_WITH_DES_CBC_SHA$", "high", "Single DES uses 56-bit key, easily brute-forced"),
+                    (r"_DES40_", "critical", "DES40 uses only 40-bit key"),
+                    (r"_RC4_", "high", "RC4 has multiple known biases and is broken"),
+                    (r"_3DES_|_DES_CBC3_", "medium", "3DES is vulnerable to SWEET32 attack"),
+                    (r"_MD5", "medium", "MD5 is cryptographically broken for integrity"),
+                ]
+                
+                for pattern, severity, description in weak_patterns:
+                    if re.search(pattern, cipher_name, re.IGNORECASE):
+                        reported_items.add(key)
+                        findings.append({{
+                            "target": target,
+                            "port": current_port,
+                            "type": "ssl",
+                            "confidence": "confirmed",
+                            "severity": severity,
+                            "title": f"Weak Cipher: {{cipher_name}}",
+                            "description": f"{{description}} Server accepted this cipher during TLS handshake.",
+                            "evidence": f"{{current_protocol}}: {{cipher_name}} - Grade {{grade}}"
+                        }})
+                        break
+                
+                # Grade F ciphers are always problematic
+                if grade == "F" and key not in reported_items:
+                    reported_items.add(key)
                     findings.append({{
                         "target": target,
                         "port": current_port,
                         "type": "ssl",
-                        "severity": "high" if cipher in ["RC4", "DES", "NULL", "EXPORT"] else "medium",
-                        "title": f"Weak Cipher Supported: {{cipher}}",
-                        "description": f"Server supports weak cipher suite containing {{cipher}}.",
-                        "evidence": line.strip()
-                    }})
-                    break
-            
-            # Check for certificate issues
-            if "commonName" in line or "subject:" in line.lower():
-                if "expired" in line.lower():
-                    findings.append({{
-                        "target": target,
-                        "port": current_port,
-                        "type": "ssl",
+                        "confidence": "confirmed",
                         "severity": "high",
-                        "title": "Expired SSL Certificate",
-                        "description": "SSL certificate has expired.",
-                        "evidence": line.strip()
+                        "title": f"Grade F Cipher: {{cipher_name}}",
+                        "description": "This cipher received the lowest grade (F) indicating severe weakness.",
+                        "evidence": f"{{current_protocol}}: {{cipher_name}} - Grade F"
+                    }})
+                continue
+            
+            # "least strength" line indicates the overall security level
+            least_match = re.search(r"least strength:\\s*([A-F])", line_stripped, re.IGNORECASE)
+            if least_match and current_port:
+                grade = least_match.group(1).upper()
+                key = (current_port, "least_strength")
+                if key not in reported_items and grade in ["D", "F"]:
+                    reported_items.add(key)
+                    findings.append({{
+                        "target": target,
+                        "port": current_port,
+                        "type": "ssl",
+                        "confidence": "confirmed",
+                        "severity": "high" if grade == "F" else "medium",
+                        "title": f"Overall TLS Configuration: Grade {{grade}}",
+                        "description": f"The weakest accepted cipher has grade {{grade}}. This indicates poor TLS configuration.",
+                        "evidence": f"least strength: {{grade}}"
+                    }})
+                continue
+            
+            # Certificate issues from ssl-cert script (these are direct observations)
+            if "not valid after" in line_stripped.lower():
+                # Check if certificate is expired
+                date_match = re.search(r"not valid after:\\s*(.+)", line_stripped, re.IGNORECASE)
+                if date_match:
+                    try:
+                        from datetime import datetime
+                        # Try parsing common date formats
+                        date_str = date_match.group(1).strip()
+                        # nmap format: "2024-01-15T12:00:00"
+                        if "T" in date_str:
+                            exp_date = datetime.fromisoformat(date_str.replace("Z", "+00:00").split("+")[0])
+                        else:
+                            exp_date = datetime.strptime(date_str[:19], "%Y-%m-%d %H:%M:%S")
+                        
+                        if exp_date < datetime.now():
+                            key = (current_port, "expired_cert")
+                            if key not in reported_items:
+                                reported_items.add(key)
+                                findings.append({{
+                                    "target": target,
+                                    "port": current_port,
+                                    "type": "ssl",
+                                    "confidence": "confirmed",
+                                    "severity": "high",
+                                    "title": "Expired SSL Certificate",
+                                    "description": "The SSL certificate has expired.",
+                                    "evidence": line_stripped
+                                }})
+                    except:
+                        pass
+            
+            # Self-signed certificate detection
+            if "self-signed" in line_stripped.lower():
+                key = (current_port, "self_signed")
+                if key not in reported_items:
+                    reported_items.add(key)
+                    findings.append({{
+                        "target": target,
+                        "port": current_port,
+                        "type": "ssl",
+                        "confidence": "confirmed",
+                        "severity": "medium",
+                        "title": "Self-Signed Certificate",
+                        "description": "Server uses a self-signed certificate which browsers will not trust.",
+                        "evidence": line_stripped
                     }})
             
-            if "self-signed" in line.lower() or "selfsigned" in line.lower():
-                findings.append({{
-                    "target": target,
-                    "port": current_port,
-                    "type": "ssl",
-                    "severity": "medium",
-                    "title": "Self-Signed Certificate",
-                    "description": "Server uses a self-signed certificate which cannot be trusted.",
-                    "evidence": line.strip()
-                }})
-            
-            # Check for CRIME/BREACH
-            if "compression" in line.lower() and ("enabled" in line.lower() or "yes" in line.lower()):
-                findings.append({{
-                    "target": target,
-                    "port": current_port,
-                    "type": "ssl",
-                    "severity": "medium",
-                    "title": "TLS Compression Enabled",
-                    "description": "TLS compression is enabled, vulnerable to CRIME attack.",
-                    "evidence": line.strip()
-                }})
-            
-            # Check for weak DH params
-            if "dh" in line.lower() and ("512" in line or "768" in line or "1024" in line):
-                findings.append({{
-                    "target": target,
-                    "port": current_port,
-                    "type": "ssl",
-                    "severity": "high",
-                    "title": "Weak Diffie-Hellman Parameters",
-                    "description": "Server uses weak DH parameters (< 2048 bits), vulnerable to Logjam.",
-                    "evidence": line.strip()
-                }})
+            # Weak DH parameters from ssl-dh-params script
+            dh_match = re.search(r"(?:DH|DHE|ECDHE).*?(\\d+)\\s*bits?", line_stripped)
+            if dh_match:
+                bits = int(dh_match.group(1))
+                if bits < 2048:
+                    key = (current_port, f"weak_dh_{{bits}}")
+                    if key not in reported_items:
+                        reported_items.add(key)
+                        findings.append({{
+                            "target": target,
+                            "port": current_port,
+                            "type": "ssl",
+                            "confidence": "confirmed",
+                            "severity": "high" if bits <= 1024 else "medium",
+                            "title": f"Weak Diffie-Hellman Parameters ({{bits}} bits)",
+                            "description": f"DH key exchange uses only {{bits}} bits. Minimum 2048 bits recommended. <=1024 bits vulnerable to Logjam.",
+                            "evidence": line_stripped
+                        }})
         
         return findings
     
