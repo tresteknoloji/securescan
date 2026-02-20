@@ -1710,7 +1710,7 @@
                     "os_info": os_info,
                     "installed_tools": tools,
                     "detected_networks": networks,
-                    "agent_version": "1.2.1",
+                    "agent_version": "1.2.0",
                     "hostname": socket.gethostname(),
                     "ip_address": self.get_public_ip()
                 }}
@@ -1732,7 +1732,7 @@
             
             for service in ip_services:
                 try:
-                    req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.2.1"}})
+                    req = urllib.request.Request(service, headers={{"User-Agent": "SecureScan-Agent/1.2.0"}})
                     response = urllib.request.urlopen(req, timeout=5)
                     ip = response.read().decode('utf-8').strip()
                     if ip and len(ip) < 50:  # Basic validation
