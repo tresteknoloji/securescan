@@ -1673,12 +1673,12 @@ CONFIG_FILE = Path("/opt/securescan-agent/config.json")
 # Scanner identification - sent in all HTTP requests
 SCANNER_VERSION = "1.3.0"
 SCANNER_NAME = "Tres Technology SecureScan"
-SCANNER_USER_AGENT = f"{{SCANNER_NAME}}/{{SCANNER_VERSION}} (Security Scanner; +https://trestechnology.net)"
+SCANNER_USER_AGENT = f"{{SCANNER_NAME}}/{{SCANNER_VERSION}} (Security Scanner; +https://tresteknoloji.com)"
 SCANNER_HEADERS = {{
     "User-Agent": SCANNER_USER_AGENT,
     "X-Scanner": SCANNER_NAME,
     "X-Scanner-Version": SCANNER_VERSION,
-    "X-Scanner-Contact": "security@trestechnology.net"
+    "X-Scanner-Contact": "info@tresteknoloji.com"
 }}
 
 class SecureScanAgent:
