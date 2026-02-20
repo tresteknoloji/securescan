@@ -2036,7 +2036,7 @@ class SecureScanAgent:
                 await self.send({{"type": "task_progress", "task_id": task_id, "progress": base_progress + 15}})
                 
                 ssl_port_str = ",".join(str(p) for p in ssl_ports[:5])  # Limit to 5 ports
-                ssl_cmd = f"nmap -sV -p {{ssl_port_str}} --script=ssl-enum-ciphers,ssl-cert,ssl-date,ssl-known-key,ssl-dh-params {{target}}"
+                ssl_cmd = f"nmap -sV -p {{ssl_port_str}} --script=ssl-enum-ciphers,ssl-cert,ssl-date,ssl-known-key,ssl-dh-params {{nmap_http_args}} {{target}}"
                 
                 logger.info(f"Phase 2 - SSL Scan: {{ssl_cmd}}")
                 
@@ -2057,7 +2057,7 @@ class SecureScanAgent:
             # Run vulnerability scripts on open ports - use faster script set
             # Avoid --script=vuln which runs too many slow scripts
             port_str = ",".join(str(p) for p in open_ports[:15])  # Limit to 15 ports
-            nse_cmd = f"nmap -sV -p {{port_str}} --script=banner,http-title,ssh-hostkey,ssl-cert,ftp-anon,smb-vuln-ms17-010 -T4 {{target}}"
+            nse_cmd = f"nmap -sV -p {{port_str}} --script=banner,http-title,ssh-hostkey,ssl-cert,ftp-anon,smb-vuln-ms17-010 -T4 {{nmap_http_args}} {{target}}"
             
             logger.info(f"Phase 3 - NSE Scan: {{nse_cmd}}")
             
