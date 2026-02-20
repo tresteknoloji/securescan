@@ -35,8 +35,16 @@ A Nessus-like vulnerability scanning panel with:
         └── pages/
             ├── AgentsPage.jsx
             ├── ScanDetailPage.jsx
+            ├── NewScanPage.jsx
             └── ...
 ```
+
+## Scan Types
+1. **quick** - Hızlı Tarama (Top 100 ports)
+2. **full** - Tam Tarama (All 65535 ports)
+3. **stealth** - Gizli Tarama (SYN scan)
+4. **port_only** - Port Tarama (Sadece port ve servis tespiti, CVE/SSL yok)
+5. **dns_recursive** - Recursive DNS (DNS amplification kontrolü, sadece IP/Prefix)
 
 ## Key Technical Details
 - **Backend**: FastAPI, MongoDB (motor), JWT, asyncio, websockets
@@ -54,49 +62,31 @@ A Nessus-like vulnerability scanning panel with:
 
 ## Changelog
 
+### 2026-02-20 - Agent v1.3.0 Release
+**ADDED**: New Scan Types
+- **Port Tarama (port_only)**: Fast port-only scan without CVE/SSL checks
+- **Recursive DNS (dns_recursive)**: Checks for DNS recursive query vulnerability
+  - Uses dig command to test recursive queries
+  - Only works with IP and Prefix targets (domain targets rejected)
+  - Reports DNS amplification attack risk if recursive enabled
+
 ### 2026-02-20 - Agent v1.2.1 Release
 **FIXED**: SSL/TLS False Positive Issue
-- Root cause: Old code matched "NULL" or "DES" anywhere in the line, causing false positives
-- Solution: Complete rewrite of `parse_ssl_findings()` function:
-  - Now correctly parses nmap ssl-enum-ciphers output format
-  - Uses regex patterns for ACTUAL cipher names (e.g., `TLS_RSA_WITH_NULL_SHA`)
-  - Uses nmap's A-F grade system
-  - Only reports ciphers that were actually negotiated by nmap
-  - Added duplicate prevention with `reported_items` set
-  - All findings now include `confidence: confirmed` field
+- Correct nmap ssl-enum-ciphers output parsing
+- Uses nmap A-F grade system
+- Only reports ciphers actually negotiated
 
 ### 2026-02-20 - Agent v1.2.0 Release
 **FIXED**: WebSocket connection check compatibility with websockets 15.0.1
-- Root cause: `self.ws.closed` attribute doesn't exist in websockets 15.x
-- Solution: Added `is_ws_open()` method using `State.OPEN` enum check
-- Impact: Agent can now properly send system_info, heartbeats, and scan results
-
-### Previous Work
-- Advanced scanning (SSL, NSE, Web checks)
-- Vulnerability model enhancement (evidence, source, confidence fields)
-- UI improvements (Start/End time, duration, badges for sources)
-- Agent public IP reporting
+- Added `is_ws_open()` method using `State.OPEN` enum check
 
 ---
 
-## Current Issues Status
+## Current Status
+- Agent v1.3.0 ready with new scan types
+- Pending user installation and testing
 
-### ✅ RESOLVED - WebSocket Stability (v1.2.0)
-- Agent connection check fixed with `State.OPEN` enum
-- Pending user verification with v1.2.1 installation
-
-### ✅ RESOLVED - SSL False Positives (v1.2.1)
-- Correct nmap output parsing implemented
-- Grade-based severity assignment
-- Pending user verification
-
-### 🔄 BLOCKED - Agent Info Regression
-- Status: Waiting for v1.2.1 installation
-- Should be resolved once agent can send system_info message
-
----
-
-## Backlog (Future Tasks)
+## Backlog
 
 ### P1
 - [ ] Reseller "Login-as-Customer" feature
