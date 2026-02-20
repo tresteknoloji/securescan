@@ -2491,7 +2491,7 @@ class SecureScanAgent:
             for path in ["/.env", "/.git/config"]:
                 try:
                     url = f"{{base_url}}{{path}}"
-                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan/1.0"}})
+                    req = urllib.request.Request(url, headers=SCANNER_HEADERS)
                     resp = urllib.request.urlopen(req, timeout=3, context=ctx)
                     if resp.getcode() == 200:
                         findings.append({{
@@ -2508,7 +2508,7 @@ class SecureScanAgent:
             for path in ["/admin", "/phpmyadmin"]:
                 try:
                     url = f"{{base_url}}{{path}}"
-                    req = urllib.request.Request(url, headers={{"User-Agent": "SecureScan/1.0"}})
+                    req = urllib.request.Request(url, headers=SCANNER_HEADERS)
                     resp = urllib.request.urlopen(req, timeout=3, context=ctx)
                     if resp.getcode() == 200:
                         findings.append({{
