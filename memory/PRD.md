@@ -54,6 +54,17 @@ A Nessus-like vulnerability scanning panel with:
 
 ## Changelog
 
+### 2026-02-20 - Agent v1.2.1 Release
+**FIXED**: SSL/TLS False Positive Issue
+- Root cause: Old code matched "NULL" or "DES" anywhere in the line, causing false positives
+- Solution: Complete rewrite of `parse_ssl_findings()` function:
+  - Now correctly parses nmap ssl-enum-ciphers output format
+  - Uses regex patterns for ACTUAL cipher names (e.g., `TLS_RSA_WITH_NULL_SHA`)
+  - Uses nmap's A-F grade system
+  - Only reports ciphers that were actually negotiated by nmap
+  - Added duplicate prevention with `reported_items` set
+  - All findings now include `confidence: confirmed` field
+
 ### 2026-02-20 - Agent v1.2.0 Release
 **FIXED**: WebSocket connection check compatibility with websockets 15.0.1
 - Root cause: `self.ws.closed` attribute doesn't exist in websockets 15.x
@@ -68,20 +79,20 @@ A Nessus-like vulnerability scanning panel with:
 
 ---
 
-## Current Issues (Priority Order)
+## Current Issues Status
 
-### P0 - WebSocket Stability
-- **Status**: FIXED in v1.2.0 (pending user verification)
-- Agent connection check now uses `State.OPEN` instead of `.closed`
-- User needs to reinstall agent with v1.2.0
+### ✅ RESOLVED - WebSocket Stability (v1.2.0)
+- Agent connection check fixed with `State.OPEN` enum
+- Pending user verification with v1.2.1 installation
 
-### P0 - Agent Info Regression
-- **Status**: BLOCKED (waiting for v1.2.0 installation)
+### ✅ RESOLVED - SSL False Positives (v1.2.1)
+- Correct nmap output parsing implemented
+- Grade-based severity assignment
+- Pending user verification
+
+### 🔄 BLOCKED - Agent Info Regression
+- Status: Waiting for v1.2.1 installation
 - Should be resolved once agent can send system_info message
-
-### P1 - False Positives
-- **Status**: BLOCKED (needs stable WebSocket)
-- Need distro-aware patch checking (Ubuntu backported patches)
 
 ---
 
