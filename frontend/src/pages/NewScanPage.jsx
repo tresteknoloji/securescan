@@ -434,7 +434,7 @@ export default function NewScanPage() {
             <CardContent className="space-y-6">
               {/* Scan Type */}
               <div className="space-y-2">
-                <Label>Scan Type</Label>
+                <Label>{language === 'tr' ? 'Tarama Tipi' : 'Scan Type'}</Label>
                 <Select
                   value={config.scan_type}
                   onValueChange={(v) => setConfig({ ...config, scan_type: v })}
@@ -461,8 +461,34 @@ export default function NewScanPage() {
                         {t('stealth_scan')}
                       </div>
                     </SelectItem>
+                    <SelectItem value="port_only">
+                      <div className="flex items-center gap-2">
+                        <Server className="h-4 w-4" />
+                        {language === 'tr' ? 'Port Tarama' : 'Port Scan Only'}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="dns_recursive">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        {language === 'tr' ? 'Recursive DNS' : 'Recursive DNS'}
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                {config.scan_type === 'port_only' && (
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'tr' 
+                      ? 'Sadece açık portları tarar ve raporlar. CVE/SSL kontrolü yapılmaz.'
+                      : 'Only scans and reports open ports. No CVE/SSL checks.'}
+                  </p>
+                )}
+                {config.scan_type === 'dns_recursive' && (
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'tr' 
+                      ? 'DNS sunucusunun recursive sorguları kabul edip etmediğini kontrol eder. Sadece IP ve Prefix hedeflerle çalışır.'
+                      : 'Checks if DNS server accepts recursive queries. Only works with IP and Prefix targets.'}
+                  </p>
+                )}
               </div>
 
               {/* Port Range */}
