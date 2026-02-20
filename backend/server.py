@@ -1860,6 +1860,9 @@ class SecureScanAgent:
         """
         Check if DNS servers allow recursive queries using nmap dns-recursion script.
         Fast scan optimized for prefix/CIDR ranges.
+        
+        Important: Port 53 open does NOT mean recursive is enabled.
+        We specifically look for "Recursion appears to be enabled" in nmap output.
         """
         import re
         
@@ -1880,16 +1883,15 @@ class SecureScanAgent:
             recursive_enabled = False
             
             for line in stdout.split("\\n"):
-                # Match host line: "Nmap scan report for 1.2.3.4"
-                host_match = re.search(r"Nmap scan report for ([\\d.]+)", line)
+                # Match host line: "Nmap scan report for 1.2.3.4" or "Nmap scan report for hostname (1.2.3.4)"
+                host_match = re.search(r"Nmap scan report for (?:[^\\s]+ \\()?([\\d.]+)\\)?", line)
                 if host_match:
                     # Save previous host if it had findings
                     if current_host and port_open:
                         results.append({{
                             "host": current_host,
                             "port_open": True,
-                            "recursive_enabled": recursive_enabled,
-                            "evidence": "Recursion enabled" if recursive_enabled else "Port 53 open, recursion disabled"
+                            "recursive_enabled": recursive_enabled
                         }})
                     # Reset for new host
                     current_host = host_match.group(1)
@@ -1900,18 +1902,17 @@ class SecureScanAgent:
                 if "53/udp" in line and "open" in line.lower():
                     port_open = True
                 
-                # Check dns-recursion script output
-                if "dns-recursion" in line.lower() and "recursion" in line.lower():
-                    if "enabled" in line.lower():
-                        recursive_enabled = True
+                # Check dns-recursion script output - ONLY this confirms recursion
+                # Look for: "|_dns-recursion: Recursion appears to be enabled"
+                if "dns-recursion" in line.lower() and "recursion appears to be enabled" in line.lower():
+                    recursive_enabled = True
             
             # Don't forget the last host
             if current_host and port_open:
                 results.append({{
                     "host": current_host,
                     "port_open": True,
-                    "recursive_enabled": recursive_enabled,
-                    "evidence": "Recursion enabled" if recursive_enabled else "Port 53 open, recursion disabled"
+                    "recursive_enabled": recursive_enabled
                 }})
             
             return results
