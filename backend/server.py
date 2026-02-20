@@ -1980,16 +1980,19 @@ class SecureScanAgent:
                         }})
                 continue
             
+            # Nmap script args for HTTP User-Agent identification
+            nmap_http_args = f'--script-args http.useragent="{{SCANNER_USER_AGENT}}"'
+            
             # Build nmap command based on scan type
             if scan_type == "quick":
-                cmd = f"nmap -sV -sC -T4 --top-ports 100 --version-intensity 5 {{target}}"
+                cmd = f"nmap -sV -sC -T4 --top-ports 100 --version-intensity 5 {{nmap_http_args}} {{target}}"
             elif scan_type == "stealth":
                 cmd = f"nmap -sS -sV -T2 -p {{port_range}} --version-intensity 5 {{target}}"
             elif scan_type == "port_only":
                 # Port-only scan: Fast scan, no scripts, just service detection
                 cmd = f"nmap -sV -T4 -p {{port_range}} --version-intensity 3 {{target}}"
             else:
-                cmd = f"nmap -sV -sC -T4 -p {{port_range}} --version-intensity 7 --script=banner {{target}}"
+                cmd = f"nmap -sV -sC -T4 -p {{port_range}} --version-intensity 7 --script=banner {{nmap_http_args}} {{target}}"
             
             logger.info(f"Phase 1 - Port Scan: {{cmd}}")
             
